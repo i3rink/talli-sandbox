@@ -1,4 +1,4 @@
-<!-- Talli v3.0.9 - deployed 11 Aug 2026 -->
+<!-- Talli v3.0.9 SANDBOX - deployed 11 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.0.9';
+const APP_VERSION = 'v3.0.9 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v3.0.9';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.0.9';
+  const VERSION = 'v3.0.9 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -2509,9 +2509,9 @@ const APP_VERSION = 'v3.0.9';
       if (mod === 'remedial')   { state.module = 'remedial'; state.view = 'c6-list'; applyTheme('remedial'); loadC6Remedials().then(render); render(); return; }
       if (mod === 'goodsin')    {
         state.module = 'goodsin';
-        state.view = state.c5.tab === 'out' ? 'c5out-list' : 'c5-list';
+        state.view = 'c5-list';
         applyTheme('goodsin');
-        if (state.c5.tab === 'out') { loadC5OutOrders().then(render); } else { render(); loadC5POs(); }
+        render(); loadC5POs();
         return;
       }
       render(); return;
@@ -2770,7 +2770,6 @@ const APP_VERSION = 'v3.0.9';
       if (entry === 'counter') {
         state.ppEntrySource = 'pp-home';
         state.module = 'goodsin';
-        state.c5.tab = 'out';
         state.view = 'c5out-list';
         applyTheme('goodsin');
         loadC5OutOrders().then(render);
@@ -5304,16 +5303,6 @@ const APP_VERSION = 'v3.0.9';
 
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
-      <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">
-        <button class="btn" data-action="c5-tab-in"
-          style="flex:1;border-radius:0;border:none;background:#0d9488;color:#fff;font-weight:700;padding:10px;">
-          &#8595; Goods In
-        </button>
-        <button class="btn" data-action="c5-tab-out"
-          style="flex:1;border-radius:0;border:none;background:#f0fdfa;color:#0f766e;font-weight:700;padding:10px;">
-          &#8593; Goods Out
-        </button>
-      </div>
       <div class="card">
         <div class="card-title">Goods In</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a PO PDF when an order is placed. When the goods arrive, tap the PO to receive it.</p>
@@ -5738,18 +5727,8 @@ const APP_VERSION = 'v3.0.9';
 
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="${state.ppEntrySource === 'pp-home' ? 'pp-back' : 'go-home'}">&#8592; Back</button></div>
-      <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">
-        <button class="btn" data-action="c5-tab-in"
-          style="flex:1;border-radius:0;border:none;background:#f0fdfa;color:#0f766e;font-weight:700;padding:10px;">
-          &#8595; Goods In
-        </button>
-        <button class="btn" data-action="c5-tab-out"
-          style="flex:1;border-radius:0;border:none;background:#0d9488;color:#fff;font-weight:700;padding:10px;">
-          &#8593; Goods Out
-        </button>
-      </div>
       <div class="card">
-        <div class="card-title">Goods Out</div>
+        <div class="card-title">Counter Orders</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a Moon Invoice PDF for a counter collection. The warehouse will pick and stage the order, then confirm when the customer collects.</p>
         ${state.c5out.uploadError ? `
           <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.83rem;color:#b91c1c;line-height:1.5;">
