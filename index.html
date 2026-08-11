@@ -1,4 +1,4 @@
-<!-- Talli v3.0.8 - deployed 11 Aug 2026 -->
+<!-- Talli v3.0.9 - deployed 11 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.0.8';
+const APP_VERSION = 'v3.0.9';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,10 +618,11 @@ const APP_VERSION = 'v3.0.8';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.0.8';
+  const VERSION = 'v3.0.9';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
+    'pp-home':  'Pick &amp; Pack · ' + VERSION,
     completion: 'Pick &amp; Pack · ' + VERSION,
     delivery:   'Driver Hub · ' + VERSION,
     stock:      'Stock Checker · ' + VERSION,
@@ -677,6 +678,7 @@ const APP_VERSION = 'v3.0.8';
     /* module 5 - goods in */
     c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null, tab: 'in', completedExpanded: false },
     c5out: { orders: [], loading: false, badgeCount: 0, activeOrder: null, activeLines: [], uploadError: null, po: null, pickChecks: [] },
+    ppEntrySource: null,   /* tracks if counter/remedial was entered from pp-home */
     adhocRemedial: { open: false, jobRef: '', itemName: '', qty: '', reason: 'damaged_delivery', submitting: false },
     c6: { items: [], loading: false, badgeCount: 0 },
     /* home dashboard */
@@ -726,6 +728,7 @@ const APP_VERSION = 'v3.0.8';
     const root = document.getElementById('root');
     const v = state.view;
     if (v === 'home')          root.innerHTML = renderHome();
+    else if (v === 'pp-home')  root.innerHTML = renderPPHome();
     else if (v === 'upload')   root.innerHTML = renderUpload();
     else if (v === 'session')  root.innerHTML = renderSession();
     else if (v === 'check')    root.innerHTML = renderCheck();
@@ -834,6 +837,75 @@ const APP_VERSION = 'v3.0.8';
   }
 
   /* ═══════════════════════════════════════════════
+     PICK & PACK HOME
+  ═══════════════════════════════════════════════ */
+  function renderPPHome() {
+    const remedialCount = (state.c6.items || []).filter(r => r.status === 'approved').length;
+    const remedialBadge = remedialCount > 0
+      ? `<span style="display:inline-block;margin-left:8px;background:#dc2626;color:#fff;font-size:.7rem;font-weight:800;min-width:20px;height:20px;border-radius:50%;text-align:center;line-height:20px;padding:0 4px;">${remedialCount}</span>`
+      : '';
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div class="card" style="cursor:pointer;border-color:#bbf7d0;background:#f0fdf4;"
+          data-action="pp-entry" data-entry="slip">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div class="card-title" style="margin-bottom:2px;color:#166534;">Packing slip</div>
+              <div class="text-muted text-sm" style="color:#15803d;">Upload packing slips and pick for installation jobs.</div>
+            </div>
+            <div style="color:#16a34a;font-size:1.3rem;flex-shrink:0;">&#8250;</div>
+          </div>
+        </div>
+
+        <div class="card" style="cursor:pointer;border-color:#bfdbfe;background:#eff6ff;"
+          data-action="pp-entry" data-entry="counter">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:#dbeafe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div class="card-title" style="margin-bottom:2px;color:#1e40af;">Counter order</div>
+              <div class="text-muted text-sm" style="color:#1d4ed8;">Trade, retail and competitor collections.</div>
+            </div>
+            <div style="color:#1d4ed8;font-size:1.3rem;flex-shrink:0;">&#8250;</div>
+          </div>
+        </div>
+
+        <div class="card" style="cursor:pointer;border-color:#fecaca;background:#fef2f2;"
+          data-action="pp-entry" data-entry="remedial">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div class="card-title" style="margin-bottom:2px;color:#991b1b;">Remedial pick${remedialBadge}</div>
+              <div class="text-muted text-sm" style="color:#dc2626;">${remedialCount > 0 ? remedialCount + ' item' + (remedialCount !== 1 ? 's' : '') + ' awaiting pick.' : 'No items awaiting pick.'}</div>
+            </div>
+            <div style="color:#dc2626;font-size:1.3rem;flex-shrink:0;">&#8250;</div>
+          </div>
+        </div>
+
+        <div class="card" style="background:#fffbeb;border-color:#fde68a;">
+          <div class="card-title" style="color:#92400e;margin-bottom:10px;">&#128269; Search by job number</div>
+          <div style="display:flex;gap:8px;">
+            <input id="pp-job-search" type="text" inputmode="numeric" placeholder="e.g. 1659"
+              style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
+            <button class="btn btn-outline" data-action="pp-job-go" style="white-space:nowrap;">Find job &#8594;</button>
+          </div>
+          <div class="text-muted text-sm" style="margin-top:8px;">Jumps straight to pick completion for that job.</div>
+        </div>
+
+      </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
      MODULE 1 - PICK VERIFIER
   ═══════════════════════════════════════════════ */
   function renderUpload() {
@@ -909,18 +981,6 @@ const APP_VERSION = 'v3.0.8';
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="upload-cancel">&#8592; Back</button></div>
       ${dupHtml}
-      <div class="card" style="background:#f0fdf4;border-color:#bbf7d0;margin-bottom:4px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <div class="card-title" style="color:#166534;margin-bottom:2px;">Pick Completion</div>
-            <div class="text-muted text-sm" style="color:#15803d;">Search a job number and mark items as picked.</div>
-          </div>
-          <button class="btn" data-action="open-module" data-mod="completion"
-            style="background:#16a34a;border-color:#16a34a;color:#fff;white-space:nowrap;flex-shrink:0;">
-            Go &#8594;
-          </button>
-        </div>
-      </div>
       <div class="card">
         <div class="card-title">New Stock Check Session</div>
         ${stagedHtml}
@@ -1231,6 +1291,7 @@ const APP_VERSION = 'v3.0.8';
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
             <button class="btn btn-ghost" data-action="go-home">&#8592; Back</button>
             <button class="btn btn-outline" data-action="submit-all" id="submit-all-btn">&#10003; Submit</button>
+            <button class="btn btn-outline" data-action="pp-go-pick" style="border-color:#059669;color:#059669;">Pick &#8594;</button>
             <button class="btn btn-primary" data-action="go-report">Report &#8594;</button>
           </div>
         </div>
@@ -1277,7 +1338,7 @@ const APP_VERSION = 'v3.0.8';
   ═══════════════════════════════════════════════ */
   function renderC2Home() {
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="pp-back">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Pick Completion</div>
         <p class="text-muted text-sm" style="margin-bottom:16px;">Enter a job number to load the pick list for that job.</p>
@@ -1323,7 +1384,7 @@ const APP_VERSION = 'v3.0.8';
     }).length;
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="pp-back">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Jobs this week - ${esc(s.code)}</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">${jobs.length} job${jobs.length !== 1 ? 's' : ''} on this session${notStarted > 0 ? ' &middot; <span style="color:#ef4444;font-weight:600;">' + notStarted + ' not started</span>' : ' &middot; <span style="color:#059669;font-weight:600;">all picked</span>'}.</p>
@@ -2440,7 +2501,7 @@ const APP_VERSION = 'v3.0.8';
       stopSnake();
       const mod = btn.dataset.mod;
       state.module = mod;
-      if (mod === 'verifier')   { state.view = 'upload'; }
+      if (mod === 'verifier')   { state.view = 'pp-home'; loadC6BadgeCount(); }
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
@@ -2455,13 +2516,13 @@ const APP_VERSION = 'v3.0.8';
       }
       render(); return;
     }
-    /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
+    /* ── upload-cancel: clears staging/append state, returns to pp-home without wiping M2/M3 ── */
     if (action === 'upload-cancel') {
       state.stagedFiles       = [];
       state.appendTarget      = null;
       state.dupWarnings       = [];
       state.dupPendingJobObjs = null;
-      state.module = 'home'; state.view = 'home';
+      state.module = 'verifier'; state.view = 'pp-home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
       render(); return;
     }
@@ -2692,6 +2753,64 @@ const APP_VERSION = 'v3.0.8';
       render();
       return;
     }
+    /* ── Pick & Pack navigation ── */
+    if (action === 'pp-back') {
+      state.ppEntrySource = null;
+      state.module = 'verifier'; state.view = 'pp-home';
+      render(); return;
+    }
+
+    /* ── Pick & Pack home entry points ── */
+    if (action === 'pp-entry') {
+      const entry = btn.dataset.entry;
+      if (entry === 'slip') {
+        state.module = 'verifier'; state.view = 'upload';
+        render(); return;
+      }
+      if (entry === 'counter') {
+        state.ppEntrySource = 'pp-home';
+        state.module = 'goodsin';
+        state.c5.tab = 'out';
+        state.view = 'c5out-list';
+        applyTheme('goodsin');
+        loadC5OutOrders().then(render);
+        render(); return;
+      }
+      if (entry === 'remedial') {
+        state.module = 'remedial'; state.view = 'c6-list';
+        applyTheme('remedial');
+        loadC6Remedials().then(render); render(); return;
+      }
+      return;
+    }
+
+    if (action === 'pp-job-go') {
+      const input = document.getElementById('pp-job-search');
+      const jobNum = (input ? input.value : '').trim().replace(/^Q/i, '');
+      if (!jobNum) { toast('Enter a job number first'); return; }
+      state.c2.prefillJob = jobNum;
+      state.module = 'verifier';
+      state.view = 'c2-home';
+      render();
+      /* auto-trigger search after DOM renders */
+      setTimeout(() => {
+        const el = document.getElementById('c2-job');
+        if (el) { el.value = jobNum; loadC2Session(); }
+      }, 80);
+      return;
+    }
+
+    /* ── Pick button from check shell — go to pick completion for current session ── */
+    if (action === 'pp-go-pick') {
+      if (!state.session) { toast('No session loaded'); return; }
+      /* load the session into c2 state from the current M1 session */
+      state.c2.session = state.session;
+      state.c2.picks = state.c2.picks || {};
+      state.c2.selectedJob = null;
+      state.view = 'c2-jobs';
+      render(); return;
+    }
+
     if (action === 'go-home') {
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
@@ -5618,7 +5737,7 @@ const APP_VERSION = 'v3.0.8';
     };
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="${state.ppEntrySource === 'pp-home' ? 'pp-back' : 'go-home'}">&#8592; Back</button></div>
       <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">
         <button class="btn" data-action="c5-tab-in"
           style="flex:1;border-radius:0;border:none;background:#f0fdfa;color:#0f766e;font-weight:700;padding:10px;">
