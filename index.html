@@ -1,4 +1,4 @@
-<!-- Talli v3.1.0 SANDBOX - deployed 12 Aug 2026 -->
+<!-- Talli v3.1.1 SANDBOX - deployed 12 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.1.0 SANDBOX';
+const APP_VERSION = 'v3.1.1 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v3.1.0 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.1.0 SANDBOX';
+  const VERSION = 'v3.1.1 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -749,6 +749,7 @@ const APP_VERSION = 'v3.1.0 SANDBOX';
     else if (v === 'c4-showroom')  root.innerHTML = renderC4Showroom();
     else if (v === 'c5-list')      root.innerHTML = renderC5List();
     else if (v === 'c5out-list')    root.innerHTML = renderC5OutList();
+    else if (v === 'c5out-type')    root.innerHTML = renderC5OutType();
     else if (v === 'c5out-upload')  root.innerHTML = renderC5OutUpload();
     else if (v === 'admin-home')   root.innerHTML = renderAdminHome();
     else if (v === 'c5out-preview') root.innerHTML = renderC5OutPreview();
@@ -2769,10 +2770,11 @@ const APP_VERSION = 'v3.1.0 SANDBOX';
       }
       if (entry === 'counter') {
         state.ppEntrySource = 'pp-home';
+        state.c5out.collectorType = null;
+        state.c5out.fulfilmentType = null;
         state.module = 'goodsin';
-        state.view = 'c5out-list';
+        state.view = 'c5out-type';
         applyTheme('goodsin');
-        loadC5OutOrders().then(render);
         render(); return;
       }
       if (entry === 'remedial') {
@@ -5682,6 +5684,48 @@ const APP_VERSION = 'v3.1.0 SANDBOX';
     state.c5out.loading = false; render();
   }
 
+  function renderC5OutType() {
+    const btnStyle = (active) => `display:flex;align-items:center;gap:14px;padding:16px;border-radius:var(--radius);border:2px solid ${active ? 'var(--teal)' : 'var(--border)'};background:${active ? 'var(--teal-faint)' : 'var(--surface)'};cursor:pointer;text-align:left;width:100%;`;
+    const ftStyle  = (active) => `flex:1;padding:14px;border-radius:var(--radius);border:2px solid ${active ? 'var(--teal)' : 'var(--border)'};background:${active ? 'var(--teal-faint)' : 'var(--surface)'};cursor:pointer;text-align:center;font-family:inherit;font-size:.95rem;font-weight:600;`;
+    const ct = state.c5out.collectorType || '';
+    const ft = state.c5out.fulfilmentType || '';
+    const types = [
+      { val: 'install',  label: 'Install',   desc: 'Delivery for a bathroom installation job',        icon: '&#128296;' },
+      { val: 'retail',   label: 'Retail',    desc: 'Supply-only customer with their own fitter',      icon: '&#127978;' },
+      { val: 'trade',    label: 'Trade',     desc: 'Tradesperson or regular trade account',           icon: '&#128736;' },
+      { val: 'external', label: 'External',  desc: 'Third party business — wholesale or one-off transfer', icon: '&#128230;' },
+    ];
+    const canProceed = ct && ft;
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="${state.ppEntrySource === 'pp-home' ? 'pp-back' : 'go-home'}">&#8592; Back</button></div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:4px;">Who is this order for?</div>
+        <p class="text-muted text-sm" style="margin-bottom:16px;">Select a customer type to continue.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
+          ${types.map(t => `
+            <button style="${btnStyle(ct === t.val)}" data-action="c5out-set-type" data-type="${t.val}">
+              <div style="width:40px;height:40px;border-radius:10px;background:${ct === t.val ? 'var(--teal-light)' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">${t.icon}</div>
+              <div style="flex:1;">
+                <div style="font-weight:700;font-size:.95rem;color:${ct === t.val ? 'var(--teal-dark)' : 'var(--text)'};">${t.label}</div>
+                <div style="font-size:.78rem;color:var(--muted);margin-top:2px;">${t.desc}</div>
+              </div>
+              ${ct === t.val ? `<span style="color:var(--teal);font-size:1.2rem;">&#10003;</span>` : ''}
+            </button>`).join('')}
+        </div>
+        <div style="margin-bottom:20px;">
+          <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px;font-weight:600;">Delivery or collection?</div>
+          <div style="display:flex;gap:10px;">
+            <button style="${ftStyle(ft === 'delivery')}" data-action="c5out-set-fulfilment" data-ft="delivery">&#128666; Delivery</button>
+            <button style="${ftStyle(ft === 'collection')}" data-action="c5out-set-fulfilment" data-ft="collection">&#127968; Collection</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;padding:14px;opacity:${canProceed ? '1' : '.45'};"
+          ${canProceed ? '' : 'disabled'} data-action="c5out-type-next">
+          Continue &#8594;
+        </button>
+      </div>`;
+  }
+
   function renderC5OutList() {
     const orders  = state.c5out.orders || [];
     const loading = state.c5out.loading;
@@ -5726,10 +5770,12 @@ const APP_VERSION = 'v3.1.0 SANDBOX';
     };
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="${state.ppEntrySource === 'pp-home' ? 'pp-back' : 'go-home'}">&#8592; Back</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-new-order">&#8592; Back</button></div>
       <div class="card">
-        <div class="card-title">Counter Orders</div>
-        <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a Moon Invoice PDF for a counter collection. The warehouse will pick and stage the order, then confirm when the customer collects.</p>
+        <div class="card-title">Goods Out</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">
+          ${state.c5out.collectorType ? `<span style="font-weight:600;text-transform:capitalize;">${state.c5out.collectorType}</span> &middot; <span style="text-transform:capitalize;">${state.c5out.fulfilmentType || 'collection'}</span> &nbsp;&mdash;&nbsp;` : ''}Upload the Moon Invoice PDF to continue.
+        </p>
         ${state.c5out.uploadError ? `
           <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.83rem;color:#b91c1c;line-height:1.5;">
             &#9888; ${esc(state.c5out.uploadError)}
@@ -5784,21 +5830,11 @@ const APP_VERSION = 'v3.1.0 SANDBOX';
           <div style="font-weight:600;">${esc(po.supplier || 'Not detected')}</div>
         </div>
         <div style="margin-bottom:12px;">
-          <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Customer type</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            ${[['install','Install'],['retail','Retail'],['trade','Trade'],['external','External']].map(([val,label]) => `
-              <button class="gi-status-btn ${state.c5out.collectorType === val ? 'active-ok' : ''}"
-                data-action="c5out-set-type" data-type="${val}"
-                style="flex:1;min-width:calc(50% - 4px);">${label}</button>`).join('')}
-          </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Fulfilment</div>
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:4px;">Order type</div>
           <div style="display:flex;gap:8px;">
-            ${['collection','delivery'].map(ft => `
-              <button class="gi-status-btn ${(state.c5out.fulfilmentType || 'collection') === ft ? 'active-ok' : ''}"
-                data-action="c5out-set-fulfilment" data-ft="${ft}"
-                style="flex:1;text-transform:capitalize;">${ft === 'collection' ? '&#127968; Collection' : '&#128666; Delivery'}</button>`).join('')}
+            <span style="font-weight:600;text-transform:capitalize;">${esc(state.c5out.collectorType || '')}</span>
+            &middot;
+            <span style="text-transform:capitalize;">${esc(state.c5out.fulfilmentType || 'collection')}</span>
           </div>
         </div>
         <div style="margin-bottom:12px;">
@@ -5944,6 +5980,18 @@ const APP_VERSION = 'v3.1.0 SANDBOX';
       state.c5out.uploadError = null; state.c5out.collectorType = null;
       state.c5out.collectionDate = null; state.c5out.lineChecks = []; state.c5out.pickChecks = [];
       state.c5out.fulfilmentType = null;
+      render(); loadC5OutOrders(); return true;
+    }
+    if (action === 'c5out-new-order') {
+      state.c5out.collectorType = null;
+      state.c5out.fulfilmentType = null;
+      state.view = 'c5out-type';
+      render(); return true;
+    }
+    if (action === 'c5out-type-next') {
+      if (!state.c5out.collectorType) { toast('Select a customer type first'); return true; }
+      if (!state.c5out.fulfilmentType) { toast('Select delivery or collection'); return true; }
+      state.view = 'c5out-list';
       render(); loadC5OutOrders(); return true;
     }
     if (action === 'c5out-set-type') {
