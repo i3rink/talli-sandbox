@@ -1,4 +1,4 @@
-<!-- Talli v3.1.4 SANDBOX - deployed 12 Aug 2026 -->
+<!-- Talli v3.1.5 SANDBOX - deployed 12 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.1.4 SANDBOX';
+const APP_VERSION = 'v3.1.5 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.1.4 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.1.4 SANDBOX';
+  const VERSION = 'v3.1.5 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -4468,9 +4468,9 @@ const APP_VERSION = 'v3.1.4 SANDBOX';
       <div class="dash-section-head" data-action="dash-module-toggle" data-module="m5" style="cursor:pointer;">
         <div class="dash-stripe" style="background:#0d9488;"></div>
         <div class="dash-section-title" style="flex:1;">04 &nbsp;Goods In</div>
-        ${m5Badge}
         <button class="btn btn-ghost" data-action="open-module" data-mod="goodsin"
-          style="padding:3px 10px;font-size:.75rem;color:#0d9488;border-color:#0d9488;margin-left:6px;flex-shrink:0;">Open &#8594;</button>
+          style="padding:3px 10px;font-size:.75rem;color:#0d9488;border-color:#0d9488;flex-shrink:0;">Open &#8594;</button>
+        ${m5Badge}
         ${m5Count ? `<span class="dash-module-chevron${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">&#9658;</span>` : ''}
       </div>
       ${m5Count ? `<div class="dash-module-body${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">${m5ExceptionRows}</div>` : ''}
@@ -4507,9 +4507,9 @@ const APP_VERSION = 'v3.1.4 SANDBOX';
       <div class="dash-section-head" data-action="dash-module-toggle" data-module="go" style="cursor:pointer;">
         <div class="dash-stripe" style="background:#1d4ed8;"></div>
         <div class="dash-section-title" style="flex:1;">05 &nbsp;Goods Out</div>
+        <button class="btn btn-ghost" data-action="admin-open-goods-out"
+          style="padding:3px 10px;font-size:.75rem;color:#1d4ed8;border-color:#1d4ed8;flex-shrink:0;">Open &#8594;</button>
         ${goBadge}
-        <button class="btn btn-ghost" data-action="pp-entry" data-entry="counter"
-          style="padding:3px 10px;font-size:.75rem;color:#1d4ed8;border-color:#1d4ed8;margin-left:6px;flex-shrink:0;">Open &#8594;</button>
         ${goCount ? `<span class="dash-module-chevron${state.dashModuleExpanded.go ? ' open' : ''}" data-module="go">&#9658;</span>` : ''}
       </div>
       ${goCount ? `<div class="dash-module-body${state.dashModuleExpanded.go ? ' open' : ''}" data-module="go">${goRows}</div>` : ''}
@@ -6080,6 +6080,12 @@ const APP_VERSION = 'v3.1.4 SANDBOX';
       state.c5out.uploadError = null; state.c5out.collectorType = null;
       state.c5out.collectionDate = null; state.c5out.lineChecks = []; state.c5out.pickChecks = [];
       state.c5out.fulfilmentType = null;
+      render(); loadC5OutOrders(); return true;
+    }
+    if (action === 'admin-open-goods-out') {
+      state.module = 'goodsin';
+      state.view = 'c5out-list';
+      applyTheme('goodsin');
       render(); loadC5OutOrders(); return true;
     }
     if (action === 'c5out-new-order') {
