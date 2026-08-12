@@ -1,4 +1,4 @@
-<!-- Talli v3.1.1 SANDBOX - deployed 12 Aug 2026 -->
+<!-- Talli v3.1.2 SANDBOX - deployed 12 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.1.1 SANDBOX';
+const APP_VERSION = 'v3.1.2 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.1.1 SANDBOX';
+  const VERSION = 'v3.1.2 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -672,7 +672,7 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
     /* module 2 - pick completion */
     c2: { session: null, selectedJob: null, picks: {}, loading: false, pickerName: '' },
     /* module 3 - driver delivery */
-    c3: { jobRef: '', items: [], delivered: {}, driverName: '', loading: false, session: null, signoff: null },
+    c3: { jobRef: '', items: [], delivered: {}, driverName: '', loading: false, session: null, signoff: null, goodsOutOrder: null },
     /* module 4 - stock checker */
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
@@ -1531,6 +1531,16 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c3-back">&#8592; Back</button></div>
       <div class="card">
+        ${state.c3.goodsOutOrder ? (() => {
+          const o = state.c3.goodsOutOrder;
+          const ctMap = { install: '#dcfce7:#166534:Install', retail: '#dbeafe:#1d4ed8:Retail', trade: '#fef3c7:#92400e:Trade', external: '#f3e8ff:#7e22ce:External' };
+          const ctVal = ctMap[o.customer_type] || '#f1f5f9:#475569:Unknown';
+          const [ctBg, ctCol, ctLabel] = ctVal.split(':');
+          return `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <span style="background:${ctBg};color:${ctCol};font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;text-transform:uppercase;letter-spacing:.04em;">${ctLabel}</span>
+            <span style="background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;">&#128666; Delivery</span>
+          </div>`;
+        })() : ''}
         <div class="flex justify-between items-center" style="margin-bottom:10px;">
           <div>
             <span class="card-title" style="margin-bottom:0;">Delivering - ${esc(displayJobRef(state.c3.jobRef))}</span>
@@ -2816,7 +2826,7 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
       state.c2 = { session: null, selectedJob: null, picks: {}, loading: false, pickerName: state.c2.pickerName };
-      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
+      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null, signoff: null, goodsOutOrder: null };
       state.catExpanded = {};
       state.catSubmitted = {};
       state.dupWarnings = [];
@@ -3205,7 +3215,7 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
     /* ── module 3 ── */
     if (action === 'c3-load') { loadC3Job(); return; }
     if (action === 'c3-back') {
-      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null, signoff: null };
+      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null, signoff: null, goodsOutOrder: null };
       state.view = 'c3-home'; render(); return;
     }
     if (action === 'c3-back-to-check') { state.view = 'c3-check'; render(); return; }
@@ -3253,7 +3263,7 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
     }
     if (action === 'c3-submit')  { submitC3Delivery(); return; }
     if (action === 'c3-another') {
-      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null, signoff: null };
+      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null, signoff: null, goodsOutOrder: null };
       state.view = 'c3-home'; render(); return;
     }
 
@@ -4889,41 +4899,61 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
     const jobNum = displayJobRef(raw.replace(/^Q/i, '').trim()) || raw.trim();
     state.c3.jobRef     = jobNum;
     state.c3.driverName = driverName;
-    state.c3.loading    = true; render();
+    state.c3.loading    = true;
+    state.c3.goodsOutOrder = null;
+    render();
 
-    const { data: allPicks } = await sb.from('pick_completions').select('*')
-      .order('updated_at', { ascending: false }).limit(500);
-    const pickData = (allPicks || []).filter(r => displayJobRef(r.job_ref) === jobNum);
+    /* check goods_out_orders first — staged delivery/collection orders */
+    const { data: goOrders } = await sb.from('goods_out_orders')
+      .select('id,invoice_ref,collector_name,customer_type,fulfilment_type,status')
+      .eq('status', 'staged')
+      .eq('fulfilment_type', 'delivery')
+      .ilike('invoice_ref', jobNum)
+      .limit(5);
+    const goMatch = (goOrders || []).find(o => (o.invoice_ref || '').trim().toUpperCase() === jobNum.toUpperCase());
 
-    if (pickData.length > 0) {
-      const seen = new Map();
-      pickData.forEach(row => {
-        if (!seen.has(row.item_key) || row.updated_at > seen.get(row.item_key).updated_at) seen.set(row.item_key, row);
-      });
-      state.c3.items   = [...seen.values()].map(r => ({ key: r.item_key, name: r.item_name, sku: r.item_key.includes('-') ? r.item_key : '', qty: r.picked_qty, unit: 'pcs', jobs: [jobNum] }));
+    if (goMatch) {
+      /* load lines for this goods out order */
+      const { data: goLines } = await sb.from('goods_out_lines').select('*').eq('order_id', goMatch.id);
+      state.c3.goodsOutOrder = goMatch;
+      state.c3.items = (goLines || []).map(l => ({ key: l.id, name: l.item_name, sku: l.sku || '', qty: l.qty, unit: 'pcs', jobs: [jobNum] }));
       state.c3.session = null;
+      if (!state.c3.items.length) { state.c3.loading = false; toast('Order found but no items on it — contact office'); render(); return; }
     } else {
-      const { data: sessions } = await sb.from('sessions').select('*').order('created_at', { ascending: false }).limit(30);
-      const matched = (sessions || []).find(s =>
-        (s.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum) ||
-        (s.master_list || []).some(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
-      );
-      if (!matched) {
-        state.c3.loading = false;
-        toast('No data found for job ' + jobNum + '. Has Pick Verifier been run for this job?');
-        render(); return;
+      const { data: allPicks } = await sb.from('pick_completions').select('*')
+        .order('updated_at', { ascending: false }).limit(500);
+      const pickData = (allPicks || []).filter(r => displayJobRef(r.job_ref) === jobNum);
+
+      if (pickData.length > 0) {
+        const seen = new Map();
+        pickData.forEach(row => {
+          if (!seen.has(row.item_key) || row.updated_at > seen.get(row.item_key).updated_at) seen.set(row.item_key, row);
+        });
+        state.c3.items   = [...seen.values()].map(r => ({ key: r.item_key, name: r.item_name, sku: r.item_key.includes('-') ? r.item_key : '', qty: r.picked_qty, unit: 'pcs', jobs: [jobNum] }));
+        state.c3.session = null;
+      } else {
+        const { data: sessions } = await sb.from('sessions').select('*').order('created_at', { ascending: false }).limit(30);
+        const matched = (sessions || []).find(s =>
+          (s.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum) ||
+          (s.master_list || []).some(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
+        );
+        if (!matched) {
+          state.c3.loading = false;
+          toast('No data found for job ' + jobNum + '. Has Pick Verifier been run for this job?');
+          render(); return;
+        }
+        state.c3.session = matched;
+        /* use per-job qty when available */
+        state.c3.items = (matched.master_list || [])
+          .filter(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
+          .map(i => ({
+            ...i,
+            qty: (i.jobQtys && i.jobQtys[jobNum] != null) ? i.jobQtys[jobNum]
+               : (i.jobQtys && i.jobQtys['Q' + jobNum] != null) ? i.jobQtys['Q' + jobNum]
+               : i.qty,
+          }));
+        if (!state.c3.items.length) { state.c3.loading = false; toast('No items found for job ' + jobNum); render(); return; }
       }
-      state.c3.session = matched;
-      /* use per-job qty when available */
-      state.c3.items = (matched.master_list || [])
-        .filter(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
-        .map(i => ({
-          ...i,
-          qty: (i.jobQtys && i.jobQtys[jobNum] != null) ? i.jobQtys[jobNum]
-             : (i.jobQtys && i.jobQtys['Q' + jobNum] != null) ? i.jobQtys['Q' + jobNum]
-             : i.qty,
-        }));
-      if (!state.c3.items.length) { state.c3.loading = false; toast('No items found for job ' + jobNum); render(); return; }
     }
 
     state.c3.loading   = false;
@@ -5862,10 +5892,20 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
     const allPicked = lines.length > 0 && lines.every((_, i) => picks[i]);
     const pickedCount = picks.filter(Boolean).length;
     const isDelivery = (o.fulfilment_type || 'collection') === 'delivery';
+    const ctMap = { install: '#dcfce7:#166534:Install', retail: '#dbeafe:#1d4ed8:Retail', trade: '#fef3c7:#92400e:Trade', external: '#f3e8ff:#7e22ce:External' };
+    const ctVal = ctMap[o.customer_type] || '#f1f5f9:#475569:Unknown';
+    const [ctBg, ctCol, ctLabel] = ctVal.split(':');
+    const ftBg = isDelivery ? '#fef3c7' : '#e0f2fe';
+    const ftCol = isDelivery ? '#92400e' : '#075985';
+    const ftLabel = isDelivery ? '&#128666; Delivery' : '&#127968; Collection';
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Pick order</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <span style="background:${ctBg};color:${ctCol};font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;text-transform:uppercase;letter-spacing:.04em;">${ctLabel}</span>
+          <span style="background:${ftBg};color:${ftCol};font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;">${ftLabel}</span>
+        </div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">Tick each item as you pick it. All items must be confirmed before you can mark the order as ready.</p>
         <div style="margin-bottom:8px;font-size:.78rem;color:var(--muted);">Invoice ${esc(o.invoice_ref)} — ${esc(o.collector_name)}</div>
         <div style="margin-bottom:4px;font-size:.78rem;color:var(--muted);">${pickedCount} of ${lines.length} picked</div>
@@ -5900,6 +5940,9 @@ const APP_VERSION = 'v3.1.1 SANDBOX';
       <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">${(o.fulfilment_type || 'collection') === 'delivery' ? 'Confirm delivery' : 'Confirm collection'}</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          ${(() => { const ctMap = { install: '#dcfce7:#166534:Install', retail: '#dbeafe:#1d4ed8:Retail', trade: '#fef3c7:#92400e:Trade', external: '#f3e8ff:#7e22ce:External' }; const ctVal = ctMap[o.customer_type] || '#f1f5f9:#475569:Unknown'; const [ctBg,ctCol,ctLabel] = ctVal.split(':'); const isD = (o.fulfilment_type||'collection')==='delivery'; return `<span style="background:${ctBg};color:${ctCol};font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;text-transform:uppercase;letter-spacing:.04em;">${ctLabel}</span><span style="background:${isD?'#fef3c7':'#e0f2fe'};color:${isD?'#92400e':'#075985'};font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;">${isD?'&#128666; Delivery':'&#127968; Collection'}</span>`; })()}
+        </div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">${(o.fulfilment_type || 'collection') === 'delivery' ? 'Go through the items with the recipient. Both parties confirm everything arrived correctly, then the recipient signs below.' : 'Go through the items with the collector. Both parties confirm everything is correct, then the collector signs below.'}</p>
         <div style="margin-bottom:8px;font-size:.78rem;color:var(--muted);">Invoice ${esc(o.invoice_ref)} — ${esc(o.collector_name)}</div>
         <div style="margin-bottom:16px;">
