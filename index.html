@@ -1,4 +1,4 @@
-<!-- Talli v3.1.3 SANDBOX - deployed 12 Aug 2026 -->
+<!-- Talli v3.1.4 SANDBOX - deployed 12 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -446,10 +446,12 @@
       font-size: .88rem; font-weight: 700; flex: 1; color: var(--text);
     }
     .dash-count {
-      font-size: .72rem; font-weight: 700; padding: 2px 9px;
-      border-radius: 20px; background: #fee2e2; color: var(--red);
+      font-size: .72rem; font-weight: 800; min-width: 22px; height: 22px;
+      border-radius: 50%; background: #dc2626; color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0 5px; flex-shrink: 0;
     }
-    .dash-count.ok { background: #d1fae5; color: var(--green); }
+    .dash-count.ok { background: #d1fae5; color: var(--green); border-radius: 20px; min-width: unset; height: unset; padding: 2px 9px; font-weight: 700; }
     .dash-section-head { cursor: pointer; user-select: none; }
     .dash-module-body { display: none; }
     .dash-module-body.open { display: block; }
@@ -589,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.1.3 SANDBOX';
+const APP_VERSION = 'v3.1.4 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +620,7 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.1.3 SANDBOX';
+  const VERSION = 'v3.1.4 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -837,7 +839,8 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
               (state.dash.m1 || []).reduce((s, g) => s + g.items.length, 0) +
               (state.dash.m2 || []).reduce((s, [, rows]) => s + rows.length, 0) +
               (state.dash.m3 || []).reduce((s, [, rows]) => s + rows.length, 0) +
-              (state.dash.m5 || []).length;
+              (state.dash.m5 || []).length +
+              (state.dash.goOrders || []).length;
             return total > 0 ? `<span class="lp-badge-count">${total}</span>` : '';
           })()}
         </button>
@@ -4135,11 +4138,17 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
         <button class="btn btn-ghost" data-action="stock-oos-close" style="margin-top:6px;padding:4px 12px;font-size:.78rem;align-self:flex-start;">Close</button>
       </div>` : '';
 
+    /* suppress stock checker section entirely if nothing to flag */
+    const hasStockAlert = (stockLow && stockLow.length > 0) || (stockBackorder && stockBackorder.length > 0);
+    const stockBadge = hasStockAlert
+      ? `<span class="dash-count">${(stockLow||[]).length + (stockBackorder||[]).length}</span>`
+      : `<span class="dash-count ok">&#10003; Clear</span>`;
+
     return `<div class="dash-section">
       <div class="dash-section-head" data-action="dash-module-toggle" data-module="m4">
         <div class="dash-stripe" style="background:#7c3aed;"></div>
-        <div class="dash-section-title">04 &nbsp;Stock Checker</div>
-        <span class="dash-count" style="background:#ede9fe;color:#7c3aed;">${stockCounted} of ${stockTotal} counted</span>
+        <div class="dash-section-title" style="flex:1;">06 &nbsp;Stock Checker</div>
+        ${stockBadge}
         <span class="dash-module-chevron${state.dashModuleExpanded.m4 ? ' open' : ''}" data-module="m4">&#9658;</span>
       </div>
       <div class="dash-module-body${state.dashModuleExpanded.m4 ? ' open' : ''}" data-module="m4">
@@ -4279,7 +4288,7 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
         <div class="dash-section-head" data-action="dash-module-toggle" data-module="m1">
           <div class="dash-stripe" style="background:#0075ab;"></div>
           <div class="dash-section-title">01 &nbsp;Purchasing shortfalls</div>
-          <span class="dash-count">${m1Count} item${m1Count !== 1 ? 's' : ''}</span>
+          <span class="dash-count">${m1Count}</span>
           <span class="dash-module-chevron${state.dashModuleExpanded.m1 ? ' open' : ''}" data-module="m1">&#9658;</span>
         </div>
         <div class="dash-module-body${state.dashModuleExpanded.m1 ? ' open' : ''}" data-module="m1">
@@ -4319,7 +4328,7 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
         <div class="dash-section-head" data-action="dash-module-toggle" data-module="m2">
           <div class="dash-stripe" style="background:#059669;"></div>
           <div class="dash-section-title">02 &nbsp;Pick shortfalls</div>
-          <span class="dash-count">${m2Count} item${m2Count !== 1 ? 's' : ''}</span>
+          <span class="dash-count">${m2Count}</span>
           <span class="dash-module-chevron${state.dashModuleExpanded.m2 ? ' open' : ''}" data-module="m2">&#9658;</span>
         </div>
         <div class="dash-module-body${state.dashModuleExpanded.m2 ? ' open' : ''}" data-module="m2">
@@ -4383,7 +4392,7 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
         <div class="dash-section-head" data-action="dash-module-toggle" data-module="m3">
           <div class="dash-stripe" style="background:#ea580c;"></div>
           <div class="dash-section-title">03 &nbsp;Remedial deliveries needed</div>
-          <span class="dash-count">${m3Count} item${m3Count !== 1 ? 's' : ''}</span>
+          <span class="dash-count">${m3Count}</span>
           <span class="dash-module-chevron${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">&#9658;</span>
         </div>
         <div class="dash-module-body${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">
@@ -4433,8 +4442,8 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
     const m5 = state.dash.m5 || [];
     const m5Count = m5.length;
     const m5Badge = m5Count
-      ? `<span class="dash-count" style="background:#ccfbf1;color:#0f766e;">${m5Count} exception${m5Count !== 1 ? 's' : ''}</span>`
-      : `<span class="dash-count" style="background:#d1fae5;color:#059669;">&#10003; Clear</span>`;
+      ? `<span class="dash-count">${m5Count}</span>`
+      : `<span class="dash-count ok">&#10003; Clear</span>`;
 
     let m5ExceptionRows = '';
     if (m5Count) {
@@ -4458,7 +4467,7 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
     const m5Html = `<div class="dash-section">
       <div class="dash-section-head" data-action="dash-module-toggle" data-module="m5" style="cursor:pointer;">
         <div class="dash-stripe" style="background:#0d9488;"></div>
-        <div class="dash-section-title" style="flex:1;">05 &nbsp;Goods In</div>
+        <div class="dash-section-title" style="flex:1;">04 &nbsp;Goods In</div>
         ${m5Badge}
         <button class="btn btn-ghost" data-action="open-module" data-mod="goodsin"
           style="padding:3px 10px;font-size:.75rem;color:#0d9488;border-color:#0d9488;margin-left:6px;flex-shrink:0;">Open &#8594;</button>
@@ -4472,8 +4481,8 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
     const goCount   = goOrders.length;
     const ctMap     = { install: '#dcfce7:#166534:Install', retail: '#dbeafe:#1d4ed8:Retail', trade: '#fef3c7:#92400e:Trade', external: '#f3e8ff:#7e22ce:External' };
     const goBadge   = goCount
-      ? `<span class="dash-count" style="background:#fef3c7;color:#92400e;">${goCount} order${goCount !== 1 ? 's' : ''}</span>`
-      : `<span class="dash-count" style="background:#d1fae5;color:#059669;">&#10003; Clear</span>`;
+      ? `<span class="dash-count">${goCount}</span>`
+      : `<span class="dash-count ok">&#10003; Clear</span>`;
     const goRows = goOrders.map(o => {
       const ctVal = ctMap[o.customer_type] || '#f1f5f9:#475569:Unknown';
       const [ctBg, ctCol, ctLabel] = ctVal.split(':');
@@ -4497,7 +4506,7 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
     const goHtml = `<div class="dash-section">
       <div class="dash-section-head" data-action="dash-module-toggle" data-module="go" style="cursor:pointer;">
         <div class="dash-stripe" style="background:#1d4ed8;"></div>
-        <div class="dash-section-title" style="flex:1;">06 &nbsp;Goods Out</div>
+        <div class="dash-section-title" style="flex:1;">05 &nbsp;Goods Out</div>
         ${goBadge}
         <button class="btn btn-ghost" data-action="pp-entry" data-entry="counter"
           style="padding:3px 10px;font-size:.75rem;color:#1d4ed8;border-color:#1d4ed8;margin-left:6px;flex-shrink:0;">Open &#8594;</button>
@@ -4506,7 +4515,7 @@ const APP_VERSION = 'v3.1.3 SANDBOX';
       ${goCount ? `<div class="dash-module-body${state.dashModuleExpanded.go ? ' open' : ''}" data-module="go">${goRows}</div>` : ''}
     </div>`;
 
-    return altHtml + m1Html + m2Html + m3Html + stockHtml + m5Html + goHtml;
+    return altHtml + m1Html + m2Html + m3Html + m5Html + goHtml + stockHtml;
   }
 
   /* ── Dashboard copy functions ── */
