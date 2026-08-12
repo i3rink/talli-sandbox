@@ -1,4 +1,4 @@
-<!-- Talli v3.0.9 SANDBOX - deployed 11 Aug 2026 -->
+<!-- Talli v3.1.0 SANDBOX - deployed 12 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.0.9 SANDBOX';
+const APP_VERSION = 'v3.1.0 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v3.0.9 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.0.9 SANDBOX';
+  const VERSION = 'v3.1.0 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -871,8 +871,8 @@ const APP_VERSION = 'v3.0.9 SANDBOX';
               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
             </div>
             <div style="flex:1;">
-              <div class="card-title" style="margin-bottom:2px;color:#1e40af;">Counter order</div>
-              <div class="text-muted text-sm" style="color:#1d4ed8;">Trade, retail and competitor collections.</div>
+              <div class="card-title" style="margin-bottom:2px;color:#1e40af;">Goods out</div>
+              <div class="text-muted text-sm" style="color:#1d4ed8;">Retail, trade, external and counter collections.</div>
             </div>
             <div style="color:#1d4ed8;font-size:1.3rem;flex-shrink:0;">&#8250;</div>
           </div>
@@ -5690,7 +5690,7 @@ const APP_VERSION = 'v3.0.9 SANDBOX';
     const done    = orders.filter(o => o.status === 'complete');
 
     const collectorBadge = t => {
-      const map = { tradesman: '#dbeafe:#1d4ed8:Tradesman', competitor: '#fef3c7:#92400e:Competitor', customer: '#dcfce7:#166534:Customer' };
+      const map = { install: '#dcfce7:#166534:Install', retail: '#dbeafe:#1d4ed8:Retail', trade: '#fef3c7:#92400e:Trade', external: '#f3e8ff:#7e22ce:External' };
       const v = map[t] || '#f1f5f9:#475569:Unknown';
       const [bg, col, label] = v.split(':');
       return `<span style="background:${bg};color:${col};font-size:.68rem;font-weight:700;border-radius:20px;padding:2px 8px;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
@@ -5716,7 +5716,7 @@ const APP_VERSION = 'v3.0.9 SANDBOX';
               <div class="gi-po-supplier">${esc(o.collector_name || 'Unknown collector')}</div>
               ${date ? `<div class="gi-po-date">${date}</div>` : ''}
             </div>
-            <div style="margin-top:4px;">${collectorBadge(o.collector_type)}</div>
+            <div style="margin-top:4px;">${collectorBadge(o.customer_type)}</div>
           </div>
           <span style="font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;flex-shrink:0;${statusStyle}">${statusLabel}</span>
           <button class="btn btn-ghost" data-action="c5out-delete" data-id="${esc(o.id)}" data-ref="${esc(o.invoice_ref)}"
@@ -5784,12 +5784,12 @@ const APP_VERSION = 'v3.0.9 SANDBOX';
           <div style="font-weight:600;">${esc(po.supplier || 'Not detected')}</div>
         </div>
         <div style="margin-bottom:12px;">
-          <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Collector type</div>
-          <div style="display:flex;gap:8px;">
-            ${['tradesman','competitor','customer'].map(t => `
-              <button class="gi-status-btn ${state.c5out.collectorType === t ? 'active-ok' : ''}"
-                data-action="c5out-set-type" data-type="${t}"
-                style="flex:1;text-transform:capitalize;">${t}</button>`).join('')}
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Customer type</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${[['install','Install'],['retail','Retail'],['trade','Trade'],['external','External']].map(([val,label]) => `
+              <button class="gi-status-btn ${state.c5out.collectorType === val ? 'active-ok' : ''}"
+                data-action="c5out-set-type" data-type="${val}"
+                style="flex:1;min-width:calc(50% - 4px);">${label}</button>`).join('')}
           </div>
         </div>
         <div style="margin-bottom:12px;">
@@ -5967,7 +5967,7 @@ const APP_VERSION = 'v3.0.9 SANDBOX';
     if (action === 'c5out-save') {
       const po = state.c5out.po;
       if (!po) return true;
-      if (!state.c5out.collectorType) { toast('Select a collector type first'); return true; }
+      if (!state.c5out.collectorType) { toast('Select a customer type first'); return true; }
       const dateVal = document.getElementById('go-date-input');
       const collDate = dateVal ? dateVal.value : (state.c5out.collectionDate || new Date().toISOString().slice(0,10));
       (async () => {
@@ -5976,7 +5976,7 @@ const APP_VERSION = 'v3.0.9 SANDBOX';
             .insert({
               invoice_ref:      po.poNumber,
               collector_name:   po.supplier,
-              collector_type:   state.c5out.collectorType,
+              customer_type:    state.c5out.collectorType,
               fulfilment_type:  state.c5out.fulfilmentType || 'collection',
               collection_date:  collDate,
               status:           'pending',
