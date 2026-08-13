@@ -1,4 +1,4 @@
-<!-- Talli v3.1.5 SANDBOX - deployed 12 Aug 2026 -->
+<!-- Talli v3.1.6 SANDBOX - deployed 13 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.1.5 SANDBOX';
+const APP_VERSION = 'v3.1.6 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.1.5 SANDBOX';
+  const VERSION = 'v3.1.6 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -840,7 +840,8 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
               (state.dash.m2 || []).reduce((s, [, rows]) => s + rows.length, 0) +
               (state.dash.m3 || []).reduce((s, [, rows]) => s + rows.length, 0) +
               (state.dash.m5 || []).length +
-              (state.dash.goOrders || []).length;
+              (state.dash.goOrders || []).length +
+              (state.dash.fitterRemedials || []).length;
             return total > 0 ? `<span class="lp-badge-count">${total}</span>` : '';
           })()}
         </button>
@@ -2950,6 +2951,20 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
       return;
     }
 
+    if (action === 'dash-approve-fitter-remedial') {
+      const id = btn.dataset.id;
+      btn.disabled = true;
+      btn.textContent = 'Approving…';
+      const { error } = await sb.from('remedials')
+        .update({ status: 'ready', actioned_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) { toast('Approve failed — try again'); btn.disabled = false; btn.textContent = 'Approve'; return; }
+      toast('Remedial approved — sent to warehouse');
+      loadDashboard();
+      loadC6Remedials().then(render);
+      return;
+    }
+
     /* ── module 1 ── */
     if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
     if (action === 'drive-pick')   { handleDrivePick(); return; }
@@ -3979,7 +3994,7 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
       const STOCK_COLS = 'id,name,sku,current_qty,low_stock_qty,backorder_until,backorder_note,stocked,oos_expected_date,oos_expected_label';
 
       const [
-        picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes, goRes,
+        picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes, goRes, fitterRemRes,
       ] = await Promise.allSettled([
         sb.from('pick_completions').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
         sb.from('deliveries').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
@@ -3989,16 +4004,18 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
         sb.from('stock_items').select(STOCK_COLS),
         sb.from('goods_in_lines').select('*, goods_in_pos(po_number, supplier, po_date)').or('has_partial.eq.true,has_damage.eq.true').eq('resolved', false).order('created_at', { ascending: false }).limit(100),
         sb.from('goods_out_orders').select('id,invoice_ref,collector_name,customer_type,fulfilment_type,status,created_at').in('status', ['pending','staged']).order('created_at', { ascending: false }).limit(100),
+        sb.from('remedials').select('id,job_ref,item_name,notes,created_at').eq('source', 'fitter').eq('status', 'pending').order('created_at', { ascending: false }).limit(100),
       ]);
 
-      const picks        = picksRes.status       === 'fulfilled' ? (picksRes.value.data       || []) : [];
-      const delivs       = delivsRes.status      === 'fulfilled' ? (delivsRes.value.data      || []) : [];
-      const remedialPoData = remedialPoRes.status === 'fulfilled' ? (remedialPoRes.value.data  || []) : [];
-      const shortChecks  = shortChecksRes.status  === 'fulfilled' ? (shortChecksRes.value.data || []) : [];
-      const alts         = altsRes.status         === 'fulfilled' ? (altsRes.value.data        || []) : [];
-      const stock        = stockRes.status        === 'fulfilled' ? (stockRes.value.data       || []) : [];
-      const giExceptions = giRes.status           === 'fulfilled' ? (giRes.value.data          || []) : [];
-      const goOrders     = goRes.status           === 'fulfilled' ? (goRes.value.data          || []) : [];
+      const picks          = picksRes.status       === 'fulfilled' ? (picksRes.value.data       || []) : [];
+      const delivs         = delivsRes.status      === 'fulfilled' ? (delivsRes.value.data      || []) : [];
+      const remedialPoData = remedialPoRes.status  === 'fulfilled' ? (remedialPoRes.value.data  || []) : [];
+      const shortChecks    = shortChecksRes.status === 'fulfilled' ? (shortChecksRes.value.data || []) : [];
+      const alts           = altsRes.status        === 'fulfilled' ? (altsRes.value.data        || []) : [];
+      const stock          = stockRes.status       === 'fulfilled' ? (stockRes.value.data       || []) : [];
+      const giExceptions   = giRes.status          === 'fulfilled' ? (giRes.value.data          || []) : [];
+      const goOrders       = goRes.status          === 'fulfilled' ? (goRes.value.data          || []) : [];
+      const fitterRemedials = fitterRemRes.status  === 'fulfilled' ? (fitterRemRes.value.data   || []) : [];
 
       /* ── Remedial PO refs ── */
       state.dashRemedialPORefs = {};
@@ -4048,7 +4065,7 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
       state.dash = {
         loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts,
         stockTotal: stock.length, stockCounted, stockLow, stockBackorder, stockAll: stock,
-        m5: giExceptions, goOrders,
+        m5: giExceptions, goOrders, fitterRemedials,
       };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
@@ -4241,13 +4258,14 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
   }
 
   function renderDashboardContent() {
-    const { m1, m2, m3 } = state.dash;
+    const { m1, m2, m3, fitterRemedials } = state.dash;
     const m1Count = m1.reduce((s, g) => s + g.items.length, 0);
     const m2Count = m2.reduce((s, [, rows]) => s + rows.length, 0);
     const m3Count = m3.reduce((s, [, rows]) => s + rows.length, 0);
+    const fitterCount = (fitterRemedials || []).length;
     const stockHtml = renderStockDashSection();
 
-    if (!m1Count && !m2Count && !m3Count) {
+    if (!m1Count && !m2Count && !m3Count && !fitterCount) {
       return `<div class="dash-clear">
         <div class="dash-clear-icon">&#10003;</div>
         <div style="font-weight:700;color:var(--green);margin-bottom:4px;">All clear</div>
@@ -4342,7 +4360,31 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
 
     /* ── M3: expandable per-job ── */
     let m3Html = '';
-    if (m3Count) {
+    if (m3Count || fitterCount) {
+      /* ── Fitter-raised pending remedials ── */
+      const fitterBlocks = (fitterRemedials || []).map(r => {
+        const jobDisplay = displayJobRef(r.job_ref || '') || r.job_ref || '—';
+        const itemLabel = (r.item_name && r.item_name.trim()) ? esc(r.item_name) : 'Unspecified item';
+        const notesLine = r.notes
+          ? `<div style="font-size:.8rem;color:var(--text);margin-top:4px;">${esc(r.notes)}</div>`
+          : '';
+        return `
+          <div class="dash-session" style="border-left:3px solid #7c3aed;padding-left:10px;margin-bottom:8px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <span style="font-weight:600;font-size:.9rem;">Job ${esc(jobDisplay)}</span>
+                  <span style="font-size:.68rem;background:#ede9fe;color:#7c3aed;padding:2px 6px;border-radius:4px;font-weight:600;">FITTER</span>
+                </div>
+                <div style="font-size:.85rem;color:var(--text);margin-top:4px;font-weight:500;">${itemLabel}</div>
+                ${notesLine}
+              </div>
+              <button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;"
+                data-action="dash-approve-fitter-remedial" data-id="${esc(r.id)}">Approve</button>
+            </div>
+          </div>`;
+      }).join('');
+
       const jobBlocks = m3.map(([job, items]) => {
         const key = 'm3-' + job;
         const isOpen = !!state.dashExpanded[key];
@@ -4388,14 +4430,16 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
           </div>`;
       }).join('');
 
+      const m3Total = m3Count + fitterCount;
       m3Html = `<div class="dash-section">
         <div class="dash-section-head" data-action="dash-module-toggle" data-module="m3">
           <div class="dash-stripe" style="background:#ea580c;"></div>
           <div class="dash-section-title">03 &nbsp;Remedial deliveries needed</div>
-          <span class="dash-count">${m3Count}</span>
+          <span class="dash-count">${m3Total}</span>
           <span class="dash-module-chevron${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">&#9658;</span>
         </div>
         <div class="dash-module-body${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">
+        ${fitterCount ? `<div style="font-size:.75rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Fitter requests — awaiting approval</div>${fitterBlocks}<div style="border-top:1px solid var(--border);margin:12px 0 12px;"></div>` : ''}
         ${jobBlocks}
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
           <button class="btn btn-ghost" data-action="dash-adhoc-remedial"
@@ -4868,14 +4912,8 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
   }
 
   async function loadC6BadgeCount() {
-    try {
-      const { count } = await sb.from('remedials')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'ready');
-      state.c6.badgeCount = count || 0;
-    } catch (e) {
-      state.c6.badgeCount = 0;
-    }
+    /* Delegates to loadC6Remedials so count and display always come from the same query */
+    await loadC6Remedials();
   }
 
   async function markRemedialReady(id) {
@@ -4918,10 +4956,15 @@ const APP_VERSION = 'v3.1.5 SANDBOX';
       const typeLabel = isCollection
         ? '<span style="font-size:.7rem;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:6px;">COLLECTION</span>'
         : '<span style="font-size:.7rem;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:6px;">DELIVERY</span>';
+      const sourceTag = r.source === 'adhoc' ? ' &middot; Ad hoc' : r.source === 'fitter' ? ' &middot; Fitter' : '';
+      const notesHtml = r.notes
+        ? '<div style="font-size:.82rem;color:var(--text);margin-top:4px;font-style:italic;">' + esc(r.notes) + '</div>'
+        : '';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);">'
         + '<div>'
         + '<div style="font-weight:600;font-size:.95rem;">' + esc(name) + typeLabel + '</div>'
-        + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + r.shortfall_qty + (r.source === 'adhoc' ? ' &middot; Ad hoc' : '') + '</div>'
+        + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + (r.shortfall_qty || '—') + sourceTag + '</div>'
+        + notesHtml
         + '</div>'
         + '<button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;padding:8px 14px;" data-action="c6-mark-complete" data-id="' + r.id + '">Picked &amp; packed</button>'
         + '</div>';
