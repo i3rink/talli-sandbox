@@ -1,4 +1,4 @@
-<!-- Talli v3.1.6 SANDBOX - deployed 13 Aug 2026 -->
+<!-- Talli v3.1.8 SANDBOX - deployed 14 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.1.6 SANDBOX';
+const APP_VERSION = 'v3.1.8 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.1.6 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.1.6 SANDBOX';
+  const VERSION = 'v3.1.8 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -682,7 +682,7 @@ const APP_VERSION = 'v3.1.6 SANDBOX';
     c5out: { orders: [], loading: false, badgeCount: 0, activeOrder: null, activeLines: [], uploadError: null, po: null, pickChecks: [] },
     ppEntrySource: null,   /* tracks if counter/remedial was entered from pp-home */
     adhocRemedial: { open: false, jobRef: '', itemName: '', qty: '', reason: 'damaged_delivery', submitting: false },
-    c6: { items: [], loading: false, badgeCount: 0 },
+    c6: { items: [], loading: false, badgeCount: 0, capture: null },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [], m5: [] },
     dashUnlocked: false,
@@ -739,8 +739,9 @@ const APP_VERSION = 'v3.1.6 SANDBOX';
     else if (v === 'c2-jobs')  root.innerHTML = renderC2Jobs();
     else if (v === 'c2-pick')  root.innerHTML = renderC2Pick();
     else if (v === 'c2-done')  root.innerHTML = renderC2Done();
-    else if (v === 'c6-list')  root.innerHTML = renderC6List();
-    else if (v === 'c6-detail') root.innerHTML = renderC6Detail();
+    else if (v === 'c6-list')    root.innerHTML = renderC6List();
+    else if (v === 'c6-capture') root.innerHTML = renderC6Capture();
+    else if (v === 'c6-detail')  root.innerHTML = renderC6Detail();
     else if (v === 'c3-home')  root.innerHTML = renderC3Home();
     else if (v === 'c3-check')   root.innerHTML = renderC3Check();
     else if (v === 'c3-signoff') root.innerHTML = renderC3Signoff();
@@ -3231,8 +3232,36 @@ const APP_VERSION = 'v3.1.6 SANDBOX';
     if (action === 'c6-mark-complete') {
       const id = btn.dataset.id;
       if (!id) return;
-      if (!confirm('Mark this item as picked and packed?')) return;
-      markRemedialComplete(id);
+      const item = state.c6.items.find(r => r.id === id);
+      if (!item) return;
+      state.c6.capture = { id, item, postcode: '', doorNumber: '', remedialType: 'delivery' };
+      state.view = 'c6-capture';
+      render();
+      return;
+    }
+    if (action === 'c6-capture-type') {
+      if (state.c6.capture) state.c6.capture.remedialType = btn.dataset.type;
+      render();
+      return;
+    }
+    if (action === 'c6-capture-cancel') {
+      state.c6.capture = null;
+      state.view = 'c6-list';
+      render();
+      return;
+    }
+    if (action === 'c6-capture-confirm') {
+      const cap = state.c6.capture;
+      if (!cap) return;
+      const postcodeEl   = document.getElementById('c6-cap-postcode');
+      const doorEl       = document.getElementById('c6-cap-door');
+      const postcode     = postcodeEl ? postcodeEl.value.trim().toUpperCase() : '';
+      const doorNumber   = doorEl ? doorEl.value.trim() : '';
+      if (!postcode)   { toast('Postcode is required'); return; }
+      if (!doorNumber) { toast('Door number is required'); return; }
+      cap.postcode   = postcode;
+      cap.doorNumber = doorNumber;
+      markRemedialComplete(cap);
       return;
     }
     if (action === 'c2-copy-short') { copyC2Shortfall(); return; }
@@ -4902,7 +4931,7 @@ const APP_VERSION = 'v3.1.6 SANDBOX';
   async function loadC6Remedials() {
     state.c6.loading = true;
     const { data, error } = await sb.from('remedials')
-      .select('*')
+      .select('id,session_id,job_ref,item_key,item_name,shortfall_qty,remedial_type,source,notes,status,created_at')
       .eq('status', 'ready')
       .order('created_at', { ascending: false });
     if (error) { console.error('C6 load error:', error); state.c6.loading = false; return; }
@@ -4923,26 +4952,83 @@ const APP_VERSION = 'v3.1.6 SANDBOX';
     render();
   }
 
-  async function markRemedialComplete(id) {
-    const { error } = await sb.from('remedials').update({ status: 'complete', completed_at: new Date().toISOString() }).eq('id', id);
-    if (error) { toast('Failed to update: ' + (error.message || 'unknown error')); return; }
-    const item = state.c6.items.find(r => r.id === id);
-    if (item) {
-      await sb.from('deliveries').insert({
-        session_id:    item.session_id,
-        job_ref:       item.job_ref,
-        item_key:      item.item_key,
-        item_name:     item.item_name,
-        picked_qty:    item.shortfall_qty,
-        delivered_qty: item.shortfall_qty,
-        shortfall:     0,
-        notes:         'Remedial delivery',
-        created_at:    new Date().toISOString(),
-        updated_at:    new Date().toISOString(),
-      });
-    }
+  async function markRemedialComplete(cap) {
+    const { id, item, postcode, doorNumber, remedialType } = cap;
+    const now = new Date().toISOString();
+    const { error: remErr } = await sb.from('remedials').update({ status: 'complete', completed_at: now }).eq('id', id);
+    if (remErr) { toast('Failed to update remedial: ' + (remErr.message || 'unknown error')); return; }
+    const { error: delErr } = await sb.from('deliveries').insert({
+      session_id:        item.session_id   || null,
+      job_ref:           item.job_ref      || null,
+      item_key:          item.item_key     || null,
+      item_name:         item.item_name    || null,
+      picked_qty:        item.shortfall_qty || null,
+      delivered_qty:     item.shortfall_qty || null,
+      shortfall:         0,
+      notes:             'Remedial delivery',
+      customer_postcode: postcode,
+      door_number:       doorNumber,
+      is_remedial:       true,
+      source:            'remedial',
+      remedial_type:     remedialType,
+      created_at:        now,
+      updated_at:        now,
+    });
+    if (delErr) { toast('Remedial marked complete but delivery row failed: ' + (delErr.message || 'unknown error')); }
+    else { toast('Picked & packed — sent to Haul', 'success'); }
+    state.c6.capture = null;
+    state.view = 'c6-list';
     await loadC6Remedials();
     render();
+  }
+
+  function renderC6Capture() {
+    const cap = state.c6.capture;
+    if (!cap) { state.view = 'c6-list'; render(); return ''; }
+    const item = cap.item;
+    const name = (item.item_name && item.item_name.trim() && item.item_name !== '.') ? item.item_name : (item.item_key || 'Item');
+    const jobDisplay = displayJobRef(item.job_ref || '');
+
+    const typeBtn = (type, label, colour) => {
+      const active = cap.remedialType === type;
+      return '<button class="btn btn-sm" data-action="c6-capture-type" data-type="' + type + '" style="'
+        + 'flex:1;padding:10px 6px;font-weight:600;border:2px solid ' + colour + ';'
+        + (active ? 'background:' + colour + ';color:#fff;' : 'background:#fff;color:' + colour + ';')
+        + '">' + label + '</button>';
+    };
+
+    return '<div class="module-wrap">'
+      + '<button class="btn btn-ghost back-btn" data-action="c6-capture-cancel">&#8592; Back</button>'
+      + '<h2 class="module-title">Delivery Details</h2>'
+      + '<div class="card" style="margin-bottom:16px;">'
+      + '<div style="font-weight:600;font-size:.95rem;">' + esc(name) + '</div>'
+      + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + (item.shortfall_qty || '—') + '</div>'
+      + '</div>'
+      + '<div class="card">'
+      + '<div style="margin-bottom:20px;">'
+      + '<label style="display:block;font-weight:600;font-size:.85rem;margin-bottom:6px;">Customer postcode <span style="color:var(--red);">*</span></label>'
+      + '<input id="c6-cap-postcode" type="text" class="form-input" placeholder="e.g. KA7 2AB" maxlength="8" style="text-transform:uppercase;font-size:1rem;letter-spacing:.05em;" />'
+      + '</div>'
+      + '<div style="margin-bottom:20px;">'
+      + '<label style="display:block;font-weight:600;font-size:.85rem;margin-bottom:6px;">Door number <span style="color:var(--red);">*</span></label>'
+      + '<input id="c6-cap-door" type="text" class="form-input" placeholder="e.g. 14 or Flat 2" maxlength="20" />'
+      + '</div>'
+      + '<div style="margin-bottom:24px;">'
+      + '<label style="display:block;font-weight:600;font-size:.85rem;margin-bottom:8px;">Remedial type <span style="color:var(--red);">*</span></label>'
+      + '<div style="display:flex;gap:8px;">'
+      + typeBtn('delivery', 'Delivery', '#0075ab')
+      + typeBtn('swap-out', 'Swap-out', '#f59e0b')
+      + typeBtn('damaged',  'Damaged',  '#ef4444')
+      + '</div>'
+      + '<div style="font-size:.78rem;color:var(--muted);margin-top:8px;">'
+      + (cap.remedialType === 'delivery'  ? 'Deliver the missing or replacement item.' : '')
+      + (cap.remedialType === 'swap-out'  ? 'Deliver correct item and collect the wrong one back.' : '')
+      + (cap.remedialType === 'damaged'   ? 'Deliver replacement — damaged item stays on site.' : '')
+      + '</div>'
+      + '</div>'
+      + '<button class="btn btn-primary" data-action="c6-capture-confirm" style="width:100%;padding:14px;font-size:1rem;font-weight:700;">Confirm &amp; send to Haul</button>'
+      + '</div>'
+      + '</div>';
   }
 
   function renderC6List() {
