@@ -817,21 +817,14 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
           <span class="lp-desc">All van jobs — deliveries, collections and remedial runs.</span>
           <span class="lp-glyph" style="color:#ea580c;">${ic.truck}</span>
         </button>
-        <button class="lp-card c-purple" data-action="open-module" data-mod="remedial">
-          <span class="lp-num">04</span>
-          <span class="lp-name">Remedials</span>
-          <span class="lp-desc">Fitter-raised jobs from pick through to delivery.</span>
-          <span class="lp-glyph" style="color:#7c3aed;">${ic.wrench}</span>
-          ${state.c6.badgeCount > 0 ? `<span class="lp-badge-count">${state.c6.badgeCount}</span>` : ''}
-        </button>
         <button class="lp-card c-teal" data-action="open-module" data-mod="stock" style="position:relative;">
-          <span class="lp-num">05</span>
+          <span class="lp-num">04</span>
           <span class="lp-name">Stock Checker</span>
           <span class="lp-desc">Counts, levels and audit trail.</span>
           <span class="lp-glyph" style="color:#0d9488;">${ic.pkg}</span>
         </button>
         <button class="lp-card c-slate" data-action="open-module" data-mod="admin">
-          <span class="lp-num">06</span>
+          <span class="lp-num">05</span>
           <span class="lp-name">Admin</span>
           <span class="lp-desc">Dashboard and management tools.</span>
           <span class="lp-glyph" style="color:#475569;">${ic.list}</span>
@@ -842,7 +835,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
               (state.dash.m3 || []).reduce((s, [, rows]) => s + rows.length, 0) +
               (state.dash.m5 || []).length +
               (state.dash.goOrders || []).length +
-              (state.dash.fitterRemedials || []).length;
+              (state.dash.allReadyRemedials || []).length;
             return total > 0 ? `<span class="lp-badge-count">${total}</span>` : '';
           })()}
         </button>
@@ -2529,7 +2522,6 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
       if (mod === 'delivery')   { state.view = 'c3-home'; }
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
       if (mod === 'admin')      { state.module = 'admin'; applyTheme('home'); state.view = 'admin-home'; render(); return; }
-      if (mod === 'remedial')   { state.module = 'remedial'; state.view = 'c6-list'; applyTheme('remedial'); loadC6Remedials().then(render); render(); return; }
       if (mod === 'goodsin')    {
         state.module = 'goodsin';
         state.view = 'c5-list';
@@ -2799,11 +2791,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
         applyTheme('goodsin');
         render(); return;
       }
-      if (entry === 'remedial') {
-        state.module = 'remedial'; state.view = 'c6-list';
-        applyTheme('remedial');
-        loadC6Remedials().then(render); render(); return;
-      }
+
       return;
     }
 
@@ -2949,20 +2937,6 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
       if (error) { toast('Archive failed'); console.error(error); return; }
       toast('Delivery shortfalls archived');
       loadDashboard();
-      return;
-    }
-
-    if (action === 'dash-approve-fitter-remedial') {
-      const id = btn.dataset.id;
-      btn.disabled = true;
-      btn.textContent = 'Approving…';
-      const { error } = await sb.from('remedials')
-        .update({ status: 'ready', actioned_at: new Date().toISOString() })
-        .eq('id', id);
-      if (error) { toast('Approve failed — try again'); btn.disabled = false; btn.textContent = 'Approve'; return; }
-      toast('Remedial approved — sent to warehouse');
-      loadDashboard();
-      loadC6Remedials().then(render);
       return;
     }
 
@@ -3232,7 +3206,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
     if (action === 'c6-mark-complete') {
       const id = btn.dataset.id;
       if (!id) return;
-      const item = state.c6.items.find(r => r.id === id);
+      const item = (state.dash.allReadyRemedials || []).find(r => r.id === id);
       if (!item) return;
       state.c6.capture = { id, item, postcode: '', doorNumber: '', remedialType: 'delivery' };
       state.view = 'c6-capture';
@@ -3246,7 +3220,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
     }
     if (action === 'c6-capture-cancel') {
       state.c6.capture = null;
-      state.view = 'c6-list';
+      state.view = 'admin-home';
       render();
       return;
     }
@@ -4023,7 +3997,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
       const STOCK_COLS = 'id,name,sku,current_qty,low_stock_qty,backorder_until,backorder_note,stocked,oos_expected_date,oos_expected_label';
 
       const [
-        picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes, goRes, fitterRemRes,
+        picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes, goRes, allReadyRemRes,
       ] = await Promise.allSettled([
         sb.from('pick_completions').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
         sb.from('deliveries').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
@@ -4033,7 +4007,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
         sb.from('stock_items').select(STOCK_COLS),
         sb.from('goods_in_lines').select('*, goods_in_pos(po_number, supplier, po_date)').or('has_partial.eq.true,has_damage.eq.true').eq('resolved', false).order('created_at', { ascending: false }).limit(100),
         sb.from('goods_out_orders').select('id,invoice_ref,collector_name,customer_type,fulfilment_type,status,created_at').in('status', ['pending','staged']).order('created_at', { ascending: false }).limit(100),
-        sb.from('remedials').select('id,job_ref,item_name,notes,created_at').eq('source', 'fitter').eq('status', 'pending').order('created_at', { ascending: false }).limit(100),
+        sb.from('remedials').select('id,session_id,job_ref,item_key,item_name,shortfall_qty,remedial_type,source,notes,created_at').eq('status', 'ready').order('created_at', { ascending: false }).limit(200),
       ]);
 
       const picks          = picksRes.status       === 'fulfilled' ? (picksRes.value.data       || []) : [];
@@ -4044,7 +4018,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
       const stock          = stockRes.status       === 'fulfilled' ? (stockRes.value.data       || []) : [];
       const giExceptions   = giRes.status          === 'fulfilled' ? (giRes.value.data          || []) : [];
       const goOrders       = goRes.status          === 'fulfilled' ? (goRes.value.data          || []) : [];
-      const fitterRemedials = fitterRemRes.status  === 'fulfilled' ? (fitterRemRes.value.data   || []) : [];
+      const allReadyRemedials = allReadyRemRes.status === 'fulfilled' ? (allReadyRemRes.value.data || []) : [];
 
       /* ── Remedial PO refs ── */
       state.dashRemedialPORefs = {};
@@ -4094,7 +4068,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
       state.dash = {
         loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts,
         stockTotal: stock.length, stockCounted, stockLow, stockBackorder, stockAll: stock,
-        m5: giExceptions, goOrders, fitterRemedials,
+        m5: giExceptions, goOrders, allReadyRemedials,
       };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
@@ -4287,14 +4261,18 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
   }
 
   function renderDashboardContent() {
-    const { m1, m2, m3, fitterRemedials } = state.dash;
+    const { m1, m2, m3, allReadyRemedials } = state.dash;
     const m1Count = m1.reduce((s, g) => s + g.items.length, 0);
     const m2Count = m2.reduce((s, [, rows]) => s + rows.length, 0);
     const m3Count = m3.reduce((s, [, rows]) => s + rows.length, 0);
-    const fitterCount = (fitterRemedials || []).length;
+    const remTalli  = (allReadyRemedials || []).filter(r => r.source === 'talli');
+    const remFitter = (allReadyRemedials || []).filter(r => r.source === 'fitter');
+    const remHaul   = (allReadyRemedials || []).filter(r => r.source === 'haul');
+    const remAdhoc  = (allReadyRemedials || []).filter(r => r.source === 'adhoc');
+    const remTotal  = (allReadyRemedials || []).length;
     const stockHtml = renderStockDashSection();
 
-    if (!m1Count && !m2Count && !m3Count && !fitterCount) {
+    if (!m1Count && !m2Count && !m3Count && !remTotal) {
       return `<div class="dash-clear">
         <div class="dash-clear-icon">&#10003;</div>
         <div style="font-weight:700;color:var(--green);margin-bottom:4px;">All clear</div>
@@ -4387,98 +4365,115 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
       </div>`;
     }
 
-    /* ── M3: expandable per-job ── */
-    let m3Html = '';
-    if (m3Count || fitterCount) {
-      /* ── Fitter-raised pending remedials ── */
-      const fitterBlocks = (fitterRemedials || []).map(r => {
-        const jobDisplay = displayJobRef(r.job_ref || '') || r.job_ref || '—';
-        const itemLabel = (r.item_name && r.item_name.trim()) ? esc(r.item_name) : 'Unspecified item';
-        const notesLine = r.notes
-          ? `<div style="font-size:.8rem;color:var(--text);margin-top:4px;">${esc(r.notes)}</div>`
-          : '';
-        return `
-          <div class="dash-session" style="border-left:3px solid #7c3aed;padding-left:10px;margin-bottom:8px;">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-              <div style="flex:1;min-width:0;">
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                  <span style="font-weight:600;font-size:.9rem;">Job ${esc(jobDisplay)}</span>
-                  <span style="font-size:.68rem;background:#ede9fe;color:#7c3aed;padding:2px 6px;border-radius:4px;font-weight:600;">FITTER</span>
-                </div>
-                <div style="font-size:.85rem;color:var(--text);margin-top:4px;font-weight:500;">${itemLabel}</div>
-                ${notesLine}
-              </div>
-              <button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;"
-                data-action="dash-approve-fitter-remedial" data-id="${esc(r.id)}">Approve</button>
-            </div>
-          </div>`;
-      }).join('');
+    /* ── M3: Remedials — four groups always visible ── */
 
-      const jobBlocks = m3.map(([job, items]) => {
-        const key = 'm3-' + job;
-        const isOpen = !!state.dashExpanded[key];
-        const driver = items[0]?.driver_name ? ` &middot; ${esc(items[0].driver_name)}` : '';
-        const isRemedialJob = items.some(i => i.is_remedial);
-        const itemRows = items.map(i => `
-          <div class="dash-item">
-            <div class="dash-item-name">${esc(i.item_name)}</div>
-            <span class="dash-item-detail">Expected ${i.picked_qty} &middot; Delivered ${i.delivered_qty}</span>
-            <span class="dash-item-short">Short ${i.shortfall}</span>
-          </div>`).join('');
-        const job_poRef = state.dashRemedialPORefs ? (state.dashRemedialPORefs[job] || '') : '';
-        const job_moonOpened = state.dashMoonOpened ? !!state.dashMoonOpened[job] : false;
-        return `
-          <div class="dash-session">
-            <div class="dash-session-head" data-action="dash-expand" data-key="${esc(key)}">
-              <div class="dash-session-code">Job ${esc(job)}${driver}${isRemedialJob ? ' <span style="font-size:.68rem;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-weight:600;vertical-align:middle;">REMEDIAL</span>' : ''}</div>
-              <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
-              ${job_poRef
+    /* helper — renders a single ready remedial row with Picked & packed button */
+    const renderReadyRow = r => {
+      const jobDisplay = displayJobRef(r.job_ref || '') || r.job_ref || '—';
+      const name = (r.item_name && r.item_name.trim() && r.item_name !== '.') ? esc(r.item_name) : esc(r.item_key || 'Item');
+      const notesLine = r.notes ? `<div style="font-size:.8rem;color:var(--muted);margin-top:3px;font-style:italic;">${esc(r.notes)}</div>` : '';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:.9rem;">${name}</div>
+          <div style="font-size:.78rem;color:var(--muted);margin-top:2px;">Job ${esc(jobDisplay)} &middot; Qty ${r.shortfall_qty || '—'}</div>
+          ${notesLine}
+        </div>
+        <button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;padding:8px 12px;"
+          data-action="c6-mark-complete" data-id="${esc(r.id)}">Picked &amp; packed</button>
+      </div>`;
+    };
+
+    /* helper — renders a group sub-header */
+    const remGroupHead = (label, colour, count, extra) =>
+      `<div style="display:flex;align-items:center;gap:8px;padding:10px 0 6px;border-bottom:2px solid ${colour};">
+        <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${colour};">${label}</span>
+        <span style="font-size:.72rem;font-weight:700;background:${colour};color:#fff;padding:1px 7px;border-radius:10px;">${count}</span>
+        ${extra || ''}
+      </div>`;
+
+    const nothingRow = '<div style="font-size:.82rem;color:var(--muted);padding:10px 0 4px;">Nothing outstanding</div>';
+
+    /* Pick shortfall group — ready remedials from talli source + PO-raising jobs */
+    const pickShortfallReadyRows = remTalli.map(renderReadyRow).join('');
+    const jobBlocks = m3.map(([job, items]) => {
+      const key = 'm3-' + job;
+      const isOpen = !!state.dashExpanded[key];
+      const driver = items[0]?.driver_name ? ` &middot; ${esc(items[0].driver_name)}` : '';
+      const itemRows = items.map(i => `
+        <div class="dash-item">
+          <div class="dash-item-name">${esc(i.item_name)}</div>
+          <span class="dash-item-detail">Expected ${i.picked_qty} &middot; Delivered ${i.delivered_qty}</span>
+          <span class="dash-item-short">Short ${i.shortfall}</span>
+        </div>`).join('');
+      const job_poRef = state.dashRemedialPORefs ? (state.dashRemedialPORefs[job] || '') : '';
+      const job_moonOpened = state.dashMoonOpened ? !!state.dashMoonOpened[job] : false;
+      return `
+        <div class="dash-session">
+          <div class="dash-session-head" data-action="dash-expand" data-key="${esc(key)}">
+            <div class="dash-session-code">Job ${esc(job)}${driver}</div>
+            <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+            ${job_poRef
   ? `<span style="font-size:.72rem;background:#d1fae5;color:#065f46;padding:3px 8px;border-radius:6px;white-space:nowrap;">PO ${esc(job_poRef)} raised</span>`
   : job_moonOpened
     ? `<button class="btn btn-sm" style="background:#059669;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-confirm-po" data-job="${esc(job)}" data-remtype="${state.dashRemedialType && state.dashRemedialType[job] === 'collection' ? 'collection' : 'delivery'}" title="Enter the PO number from Moon Invoice">Confirm PO number</button>`
     : `<button class="btn btn-sm" style="background:#0075ab;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-raise-order" data-job="${esc(job)}" title="Open Moon Invoice to raise a PO">Raise order</button>`
 }
-              <button class="dash-archive-btn" data-action="dash-archive-m3" data-job="${esc(job)}" title="Mark job as complete">Archive</button>
-              <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
-            </div>
-            <div class="dash-session-body ${isOpen ? 'open' : ''}" data-key="${esc(key)}">
-              ${itemRows}
-              ${!job_poRef ? `
-              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-                <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;font-weight:600;">Remedial type</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                  <button class="gi-status-btn ${!(state.dashRemedialType && state.dashRemedialType[job] === 'collection') ? 'active-ok' : ''}"
-                    data-action="dash-rem-type" data-job="${esc(job)}" data-remtype="delivery"
-                    style="font-size:.78rem;padding:5px 12px;">&#128666; Delivery</button>
-                  <button class="gi-status-btn ${state.dashRemedialType && state.dashRemedialType[job] === 'collection' ? 'active-ok' : ''}"
-                    data-action="dash-rem-type" data-job="${esc(job)}" data-remtype="collection"
-                    style="font-size:.78rem;padding:5px 12px;">&#128230; Collection</button>
-                </div>
-              </div>` : ''}
-            </div>
-          </div>`;
-      }).join('');
+            <button class="dash-archive-btn" data-action="dash-archive-m3" data-job="${esc(job)}" title="Mark job as complete">Archive</button>
+            <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
+          </div>
+          <div class="dash-session-body ${isOpen ? 'open' : ''}" data-key="${esc(key)}">
+            ${itemRows}
+            ${!job_poRef ? `
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+              <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;font-weight:600;">Remedial type</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="gi-status-btn ${!(state.dashRemedialType && state.dashRemedialType[job] === 'collection') ? 'active-ok' : ''}"
+                  data-action="dash-rem-type" data-job="${esc(job)}" data-remtype="delivery"
+                  style="font-size:.78rem;padding:5px 12px;">&#128666; Delivery</button>
+                <button class="gi-status-btn ${state.dashRemedialType && state.dashRemedialType[job] === 'collection' ? 'active-ok' : ''}"
+                  data-action="dash-rem-type" data-job="${esc(job)}" data-remtype="collection"
+                  style="font-size:.78rem;padding:5px 12px;">&#128230; Collection</button>
+              </div>
+            </div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    const pickCount = remTalli.length + m3Count;
+    const pickBody = (pickShortfallReadyRows || jobBlocks) ? (pickShortfallReadyRows + jobBlocks) : nothingRow;
 
-      const m3Total = m3Count + fitterCount;
-      m3Html = `<div class="dash-section">
-        <div class="dash-section-head" data-action="dash-module-toggle" data-module="m3">
-          <div class="dash-stripe" style="background:#ea580c;"></div>
-          <div class="dash-section-title">03 &nbsp;Remedial deliveries needed</div>
-          <span class="dash-count">${m3Total}</span>
-          <span class="dash-module-chevron${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">&#9658;</span>
-        </div>
-        <div class="dash-module-body${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">
-        ${fitterCount ? `<div style="font-size:.75rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Fitter requests — awaiting approval</div>${fitterBlocks}<div style="border-top:1px solid var(--border);margin:12px 0 12px;"></div>` : ''}
-        ${jobBlocks}
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-          <button class="btn btn-ghost" data-action="dash-adhoc-remedial"
-            style="width:100%;font-size:.82rem;color:#475569;border-color:#cbd5e1;">
-            + Raise ad hoc remedial
-          </button>
-        </div>
-        </div>
-      </div>`;
-    }
+    /* Fitter group */
+    const fitterBody = remFitter.length ? remFitter.map(renderReadyRow).join('') : nothingRow;
+
+    /* Driver group */
+    const driverBody = remHaul.length ? remHaul.map(renderReadyRow).join('') : nothingRow;
+
+    /* Ad hoc group */
+    const adhocAddBtn = `<button class="btn btn-ghost" data-action="dash-adhoc-remedial"
+      style="font-size:.75rem;color:#475569;border-color:#cbd5e1;padding:3px 10px;margin-left:auto;">+ Raise ad hoc</button>`;
+    const adhocBody = remAdhoc.length ? remAdhoc.map(renderReadyRow).join('') : nothingRow;
+
+    const m3Total = remTotal + m3Count;
+    const m3Html = `<div class="dash-section">
+      <div class="dash-section-head" data-action="dash-module-toggle" data-module="m3">
+        <div class="dash-stripe" style="background:#ea580c;"></div>
+        <div class="dash-section-title">03 &nbsp;Remedial deliveries needed</div>
+        <span class="dash-count">${m3Total}</span>
+        <span class="dash-module-chevron${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3" data-arrow>&#9658;</span>
+      </div>
+      <div class="dash-module-body${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">
+        ${remGroupHead('Pick shortfall', '#0075ab', pickCount)}
+        ${pickBody}
+        <div style="margin-bottom:4px;"></div>
+        ${remGroupHead('Fitter', '#7c3aed', remFitter.length)}
+        ${fitterBody}
+        <div style="margin-bottom:4px;"></div>
+        ${remGroupHead('Driver', '#ea580c', remHaul.length)}
+        ${driverBody}
+        <div style="margin-bottom:4px;"></div>
+        ${remGroupHead('Ad hoc', '#64748b', remAdhoc.length, adhocAddBtn)}
+        ${adhocBody}
+      </div>
+    </div>`;
 
     /* ── Alternatives section ── */
     let altHtml = '';
@@ -4977,9 +4972,8 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
     if (delErr) { toast('Remedial marked complete but delivery row failed: ' + (delErr.message || 'unknown error')); }
     else { toast('Picked & packed — sent to Haul', 'success'); }
     state.c6.capture = null;
-    state.view = 'c6-list';
-    await loadC6Remedials();
-    render();
+    state.view = 'admin-home';
+    await loadDashboard();
   }
 
   function renderC6Capture() {
