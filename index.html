@@ -1,4 +1,4 @@
-<!-- Talli v3.2.6 SANDBOX - deployed 17 Aug 2026 -->
+<!-- Talli v3.2.7 SANDBOX - deployed 17 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.2.6 SANDBOX';
+const APP_VERSION = 'v3.2.7 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.2.6 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.2.6 SANDBOX';
+  const VERSION = 'v3.2.7 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -4642,30 +4642,23 @@ const APP_VERSION = 'v3.2.6 SANDBOX';
     if (!job) { results.innerHTML = '<p style="color:var(--muted);font-size:.85rem;">Enter a job number first.</p>'; return; }
     results.innerHTML = '<p style="color:var(--muted);font-size:.85rem;">Searching&#8230;</p>';
     try {
-      const listBucket = async (prefix) => {
-        const r = await fetch(
-          `${SUPABASE_URL}/storage/v1/object/list/showroom-images`,
-          {
-            method: 'POST',
-            headers: {
-              'apikey': SUPABASE_ANON,
-              'Authorization': `Bearer ${SUPABASE_ANON}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ prefix, limit: 50, offset: 0 }),
-          }
-        );
-        if (!r.ok) return [];
-        return await r.json();
-      };
-      /* Fetch photos and signatures separately using exact prefixes */
-      const [photos, sigs] = await Promise.all([
-        listBucket(`deliveries/photo-${job}-`),
-        listBucket(`deliveries/sig-${job}-`),
-      ]);
-      console.log('photo results:', JSON.stringify(photos));
-      console.log('sig results:', JSON.stringify(sigs));
-      const matched = [...(photos || []), ...(sigs || [])].filter(f => f && f.name);
+      /* List all files under deliveries/ then filter client-side by job number */
+      const r = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/list/showroom-images`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON,
+            'Authorization': `Bearer ${SUPABASE_ANON}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prefix: 'deliveries/', limit: 500, offset: 0 }),
+        }
+      );
+      if (!r.ok) throw new Error(`Storage list error ${r.status}`);
+      const files = await r.json();
+      console.log('all deliveries files:', JSON.stringify(files));
+      const matched = (files || []).filter(f => f && f.name && f.name.includes(job));
       if (!matched.length) {
         results.innerHTML = `<p style="color:var(--muted);font-size:.85rem;">No images found for job ${esc(job)}.</p>`;
         return;
