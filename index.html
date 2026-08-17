@@ -1,4 +1,4 @@
-<!-- Talli v3.2.8 SANDBOX - deployed 17 Aug 2026 -->
+<!-- Talli v3.2.9 SANDBOX - deployed 17 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.2.8 SANDBOX';
+const APP_VERSION = 'v3.2.9 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.2.8 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.2.8 SANDBOX';
+  const VERSION = 'v3.2.9 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -2843,6 +2843,14 @@ const APP_VERSION = 'v3.2.8 SANDBOX';
 
     if (action === 'dash-refresh')  { loadDashboard(); return; }
     if (action === 'delivery-lookup-search') { deliveryLookupSearch(); return; }
+    if (action === 'delivery-lookup-clear') {
+      const inp = document.getElementById('delivery-lookup-input');
+      const res = document.getElementById('delivery-lookup-results');
+      if (inp) inp.value = '';
+      if (res) res.innerHTML = '';
+      if (inp) inp.focus();
+      return;
+    }
 
     if (action === 'gi-resolve-line') {
       const id = btn.dataset.id;
@@ -4599,6 +4607,7 @@ const APP_VERSION = 'v3.2.8 SANDBOX';
             <input id="delivery-lookup-input" type="tel" inputmode="numeric" placeholder="Job number"
               style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
             <button class="btn btn-primary" data-action="delivery-lookup-search" style="flex-shrink:0;">Search</button>
+            <button class="btn btn-ghost" data-action="delivery-lookup-clear" style="flex-shrink:0;">Clear</button>
           </div>
           <div id="delivery-lookup-results"></div>
         </div>
