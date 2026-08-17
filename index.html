@@ -1,4 +1,4 @@
-<!-- Talli v3.1.8 SANDBOX - deployed 14 Aug 2026 -->
+<!-- Talli v3.2.2 SANDBOX - deployed 17 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.1.8 SANDBOX';
+const APP_VERSION = 'v3.2.2 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.1.8 SANDBOX';
+  const VERSION = 'v3.2.2 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -781,8 +781,8 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
     const h = new Date().getHours();
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
     if (state.dashUnlocked) setTimeout(loadDashboard, 0);
-    loadC6BadgeCount();
-    loadC5OutBadgeCount();
+    setTimeout(loadC6BadgeCount, 0);
+    setTimeout(loadC5OutBadgeCount, 0);
     setTimeout(startSnake, 80);
     const ic = {
       list: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="12" x2="16" y1="11" y2="11"/><line x1="8" x2="8.01" y1="11" y2="11"/><line x1="12" x2="16" y1="16" y2="16"/><line x1="8" x2="8.01" y1="16" y2="16"/></svg>`,
@@ -2840,6 +2840,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
     }
 
     if (action === 'dash-refresh')  { loadDashboard(); return; }
+    if (action === 'delivery-lookup-search') { deliveryLookupSearch(); return; }
 
     if (action === 'gi-resolve-line') {
       const id = btn.dataset.id;
@@ -3366,6 +3367,7 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.id === 'dash-pin-input') { e.preventDefault(); tryDashUnlock(); }
+    if (e.key === 'Enter' && e.target.id === 'delivery-lookup-input') { e.preventDefault(); deliveryLookupSearch(); }
   });
 
   document.addEventListener('change', e => {
@@ -4583,7 +4585,25 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
       ${goCount ? `<div class="dash-module-body${state.dashModuleExpanded.go ? ' open' : ''}" data-module="go">${goRows}</div>` : ''}
     </div>`;
 
-    return altHtml + m1Html + m2Html + m3Html + m5Html + goHtml + stockHtml;
+    const m6Html = `<div class="dash-section">
+      <div class="dash-section-head" data-action="dash-module-toggle" data-module="m6" style="cursor:pointer;">
+        <div class="dash-stripe" style="background:#0075ab;"></div>
+        <div class="dash-section-title" style="flex:1;">06 &nbsp;Delivery photo lookup</div>
+        <span class="dash-module-chevron${state.dashModuleExpanded.m6 ? ' open' : ''}" data-module="m6">&#9658;</span>
+      </div>
+      <div class="dash-module-body${state.dashModuleExpanded.m6 ? ' open' : ''}" data-module="m6">
+        <div style="padding:14px 16px;">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+            <input id="delivery-lookup-input" type="tel" inputmode="numeric" placeholder="Job number"
+              style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
+            <button class="btn btn-primary" data-action="delivery-lookup-search" style="flex-shrink:0;">Search</button>
+          </div>
+          <div id="delivery-lookup-results"></div>
+        </div>
+      </div>
+    </div>`;
+
+    return altHtml + m1Html + m2Html + m3Html + m5Html + goHtml + stockHtml + m6Html;
   }
 
   /* ── Dashboard copy functions ── */
@@ -4609,6 +4629,55 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
         });
     } else {
       navigator.clipboard.writeText(text).then(() => flashBtn(false)).catch(() => toast('Could not copy'));
+    }
+  }
+
+  async function deliveryLookupSearch() {
+    const input = document.getElementById('delivery-lookup-input');
+    const results = document.getElementById('delivery-lookup-results');
+    if (!input || !results) return;
+    const job = input.value.trim();
+    if (!job) { results.innerHTML = '<p style="color:var(--muted);font-size:.85rem;">Enter a job number first.</p>'; return; }
+    results.innerHTML = '<p style="color:var(--muted);font-size:.85rem;">Searching&#8230;</p>';
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/list/showroom-images`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON,
+            'Authorization': `Bearer ${SUPABASE_ANON}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prefix: 'deliveries/', search: job, limit: 50, offset: 0 }),
+        }
+      );
+      if (!res.ok) throw new Error(`Storage list error ${res.status}`);
+      const files = await res.json();
+      if (!files || !files.length) {
+        results.innerHTML = `<p style="color:var(--muted);font-size:.85rem;">No images found for job ${esc(job)}.</p>`;
+        return;
+      }
+      const BASE = `${SUPABASE_URL}/storage/v1/object/public/showroom-images/`;
+      results.innerHTML = `
+        <p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;">${files.length} file${files.length !== 1 ? 's' : ''} found for job ${esc(job)}</p>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;">
+          ${files.map(f => {
+            const url = BASE + f.name;
+            const label = f.name.startsWith('deliveries/sig-') ? 'Signature' : 'Photo';
+            const ts = f.created_at ? new Date(f.created_at).toLocaleString('en-GB') : '';
+            return `<div style="text-align:center;">
+              <a href="${esc(url)}" target="_blank" rel="noopener">
+                <img src="${esc(url)}" alt="${esc(label)}"
+                  style="width:160px;height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;" />
+              </a>
+              <div style="font-size:.75rem;color:var(--muted);margin-top:4px;">${esc(label)}</div>
+              ${ts ? `<div style="font-size:.72rem;color:var(--muted);">${esc(ts)}</div>` : ''}
+            </div>`;
+          }).join('')}
+        </div>`;
+    } catch (e) {
+      results.innerHTML = `<p style="color:var(--red);font-size:.85rem;">Error: ${esc(e.message)}</p>`;
     }
   }
 
@@ -4925,14 +4994,27 @@ const APP_VERSION = 'v3.1.8 SANDBOX';
 
   async function loadC6Remedials() {
     state.c6.loading = true;
-    const { data, error } = await sb.from('remedials')
-      .select('id,session_id,job_ref,item_key,item_name,shortfall_qty,remedial_type,source,notes,status,created_at')
-      .eq('status', 'ready')
-      .order('created_at', { ascending: false });
-    if (error) { console.error('C6 load error:', error); state.c6.loading = false; return; }
-    state.c6.items = data || [];
-    state.c6.badgeCount = (data || []).filter(r => r.status === 'ready').length;
-    state.c6.loading = false;
+    try {
+      const cols = 'id,session_id,job_ref,item_key,item_name,shortfall_qty,remedial_type,source,notes,status,created_at';
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/remedials?select=${cols}&status=eq.ready&order=created_at.desc`,
+        {
+          headers: {
+            'apikey':        SUPABASE_ANON,
+            'Authorization': `Bearer ${SUPABASE_ANON}`,
+            'Content-Type':  'application/json',
+          },
+        }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      state.c6.items = data || [];
+      state.c6.badgeCount = (data || []).length;
+    } catch (e) {
+      console.error('C6 load error:', e.message);
+    } finally {
+      state.c6.loading = false;
+    }
   }
 
   async function loadC6BadgeCount() {
