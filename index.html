@@ -1,4 +1,4 @@
-<!-- Talli v3.2.7 SANDBOX - deployed 17 Aug 2026 -->
+<!-- Talli v3.2.8 SANDBOX - deployed 17 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.2.7 SANDBOX';
+const APP_VERSION = 'v3.2.8 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.2.7 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.2.7 SANDBOX';
+  const VERSION = 'v3.2.8 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -4657,19 +4657,18 @@ const APP_VERSION = 'v3.2.7 SANDBOX';
       );
       if (!r.ok) throw new Error(`Storage list error ${r.status}`);
       const files = await r.json();
-      console.log('all deliveries files:', JSON.stringify(files));
       const matched = (files || []).filter(f => f && f.name && f.name.includes(job));
       if (!matched.length) {
         results.innerHTML = `<p style="color:var(--muted);font-size:.85rem;">No images found for job ${esc(job)}.</p>`;
         return;
       }
-      const BASE = `${SUPABASE_URL}/storage/v1/object/public/showroom-images/`;
+      const BASE = `${SUPABASE_URL}/storage/v1/object/public/showroom-images/deliveries/`;
       results.innerHTML = `
         <p style="font-size:.8rem;color:var(--muted);margin-bottom:12px;">${matched.length} file${matched.length !== 1 ? 's' : ''} found for job ${esc(job)}</p>
         <div style="display:flex;flex-wrap:wrap;gap:12px;">
           ${matched.map(f => {
             const url = BASE + f.name;
-            const label = f.name.startsWith('deliveries/sig-') ? 'Signature' : 'Photo';
+            const label = f.name.startsWith('sig-') ? 'Signature' : 'Photo';
             const ts = f.created_at ? new Date(f.created_at).toLocaleString('en-GB') : '';
             return `<div style="text-align:center;">
               <a href="${esc(url)}" target="_blank" rel="noopener">
