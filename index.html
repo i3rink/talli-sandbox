@@ -1,4 +1,4 @@
-<!-- Talli v3.2.9 SANDBOX - deployed 17 Aug 2026 -->
+<!-- Talli v3.3.0 SANDBOX - deployed 17 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.2.9 SANDBOX';
+const APP_VERSION = 'v3.3.0 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.2.9 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.2.9 SANDBOX';
+  const VERSION = 'v3.3.0 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -4397,13 +4397,13 @@ const APP_VERSION = 'v3.2.9 SANDBOX';
 
     /* helper — renders a group sub-header */
     const remGroupHead = (label, colour, count, extra) =>
-      `<div style="display:flex;align-items:center;gap:8px;padding:10px 0 6px;border-bottom:2px solid ${colour};">
+      `<div style="display:flex;align-items:center;gap:8px;padding:10px 0 6px 12px;border-bottom:2px solid ${colour};">
         <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${colour};">${label}</span>
         <span style="font-size:.72rem;font-weight:700;background:${colour};color:#fff;padding:1px 7px;border-radius:10px;">${count}</span>
         ${extra || ''}
       </div>`;
 
-    const nothingRow = '<div style="font-size:.82rem;color:var(--muted);padding:10px 0 4px;">Nothing outstanding</div>';
+    const nothingRow = '<div style="font-size:.82rem;color:var(--muted);padding:10px 0 4px 12px;">Nothing outstanding</div>';
 
     /* Pick shortfall group — ready remedials from talli source + PO-raising jobs */
     const pickShortfallReadyRows = remTalli.map(renderReadyRow).join('');
