@@ -1,4 +1,4 @@
-<!-- Talli v3.3.1 SANDBOX - deployed 18 Aug 2026 -->
+<!-- Talli v3.3.3 SANDBOX - deployed 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.3.1 SANDBOX';
+const APP_VERSION = 'v3.3.3 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.3.1 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.3.1 SANDBOX';
+  const VERSION = 'v3.3.3 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -818,19 +818,19 @@ const APP_VERSION = 'v3.3.1 SANDBOX';
         </button>
         <button class="lp-card c-green" data-action="open-module" data-mod="verifier">
           <span class="lp-num">02</span>
-          <span class="lp-name">Pick &amp; Pack</span>
+          <span class="lp-name">Pick & Pack</span>
           <span class="lp-desc">Pick, pack and sign off any outbound order.</span>
           <span class="lp-glyph" style="color:#059669;">${ic.check}</span>
         </button>
         <button class="lp-card c-teal" data-action="open-module" data-mod="stock" style="position:relative;">
-          <span class="lp-num">04</span>
+          <span class="lp-num">03</span>
           <span class="lp-name">Stock Checker</span>
           <span class="lp-desc">Counts, levels and audit trail.</span>
           <span class="lp-glyph" style="color:#0d9488;">${ic.pkg}</span>
         </button>
         ${(state.helmUser?.permitted_modules || []).includes('talli-admin') ? `
         <button class="lp-card c-slate" data-action="open-module" data-mod="admin" style="position:relative;">
-          <span class="lp-num">05</span>
+          <span class="lp-num">04</span>
           <span class="lp-name">Admin</span>
           <span class="lp-desc">Dashboard and management tools.</span>
           <span class="lp-glyph" style="color:#475569;">${ic.list}</span>
@@ -883,7 +883,7 @@ const APP_VERSION = 'v3.3.1 SANDBOX';
             </div>
             <div style="flex:1;">
               <div class="card-title" style="margin-bottom:2px;color:#1e40af;">Goods out</div>
-              <div class="text-muted text-sm" style="color:#1d4ed8;">Retail, trade, external and counter collections.</div>
+              <div class="text-muted text-sm" style="color:#1d4ed8;">Planned outbound stock — installs, retail, trade and external.</div>
             </div>
             <div style="color:#1d4ed8;font-size:1.3rem;flex-shrink:0;">&#8250;</div>
           </div>
