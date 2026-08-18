@@ -1,4 +1,4 @@
-<!-- Talli v3.3.4 SANDBOX - deployed 18 Aug 2026 -->
+<!-- Talli v3.3.5 SANDBOX - deployed 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.3.4 SANDBOX';
+const APP_VERSION = 'v3.3.5 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.3.4 SANDBOX';
+  const VERSION = 'v3.3.5 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick & Pack · ' + VERSION,
@@ -686,7 +686,6 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
     c6: { items: [], loading: false, badgeCount: 0, capture: null },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [], m5: [] },
-    dashUnlocked: false,
     /* expanded session keys in dashboard M1 */
     dashExpanded: {},
     dashModuleExpanded: {},
@@ -791,7 +790,7 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
   function renderHome() {
     const h = new Date().getHours();
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
-    if (state.dashUnlocked) setTimeout(loadDashboard, 0);
+    const userName = state.helmUser?.name ? `, ${esc(state.helmUser.name)}` : '';
     setTimeout(loadC6BadgeCount, 0);
     setTimeout(loadC5OutBadgeCount, 0);
     setTimeout(startSnake, 80);
@@ -806,7 +805,7 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
     return `
       <canvas id="snake-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:-1;"></canvas>
       <div class="lp-intro">
-        <h1>Good ${greet}.</h1>
+        <h1>Good ${greet}${userName}.</h1>
         <div class="text-muted text-sm">Pick a module to get started.</div>
       </div>
       <div class="lp-grid">
@@ -2868,7 +2867,6 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
     if (action === 'copy-dash-m1') { copyDashM1(); return; }
     if (action === 'copy-dash-m2') { copyDashM2(); return; }
     if (action === 'copy-dash-m3') { copyDashM3(); return; }
-    if (action === 'dash-unlock') { tryDashUnlock(); return; }
 
     /* ── dashboard module-level collapse ── */
     if (action === 'dash-module-toggle') {
@@ -3381,7 +3379,6 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.id === 'dash-pin-input') { e.preventDefault(); tryDashUnlock(); }
     if (e.key === 'Enter' && e.target.id === 'delivery-lookup-input') { e.preventDefault(); deliveryLookupSearch(); }
   });
 
@@ -3952,10 +3949,8 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
   /* ═══════════════════════════════════════════════
      HOME DASHBOARD
   ═══════════════════════════════════════════════ */
-  const DASH_PIN = '1690';
-
   function renderAdminHome() {
-    if (state.dashUnlocked) setTimeout(loadDashboard, 0);
+    setTimeout(loadDashboard, 0);
     return `
       <div class="mod-header">
         <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
@@ -3964,46 +3959,10 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
       <div class="dash-wrap">
         <div class="dash-heading">
           <span class="dash-heading-title">Pending actions</span>
-          ${state.dashUnlocked ? `<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
+          <button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>
         </div>
-        <div id="dashboard">${state.dashUnlocked ? '<div class="dash-loading">Loading&#8230;</div>' : renderDashLock()}</div>
+        <div id="dashboard"><div class="dash-loading">Loading&#8230;</div></div>
       </div>`;
-  }
-
-  function renderDashLock() {
-    return `
-      <div class="dash-section" style="text-align:center;padding:24px 20px;">
-        <div style="font-size:1.4rem;margin-bottom:8px;">&#128274;</div>
-        <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:4px;">Admin only</div>
-        <div class="text-muted text-sm" style="margin-bottom:16px;">Enter your PIN to view pending actions.</div>
-        <div style="display:flex;gap:8px;justify-content:center;align-items:center;">
-          <input id="dash-pin-input" type="tel" inputmode="numeric" maxlength="4"
-            placeholder="&#9679;&#9679;&#9679;&#9679;"
-            style="width:90px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:1.2rem;text-align:center;outline:none;letter-spacing:.15em;" />
-          <button class="btn btn-primary" data-action="dash-unlock">Unlock</button>
-        </div>
-        <div id="dash-pin-error" style="color:var(--red);font-size:.8rem;margin-top:10px;min-height:18px;"></div>
-      </div>`;
-  }
-
-  function tryDashUnlock() {
-    const input = document.getElementById('dash-pin-input');
-    if (!input) return;
-    if (input.value.trim() === DASH_PIN) {
-      state.dashUnlocked = true;
-      const el = document.getElementById('dashboard');
-      if (el) el.innerHTML = '<div class="dash-loading">Loading&#8230;</div>';
-      const heading = document.querySelector('.dash-heading');
-      if (heading) heading.innerHTML =
-        '<span class="dash-heading-title">Pending actions</span>' +
-        '<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>';
-      loadDashboard();
-    } else {
-      const err = document.getElementById('dash-pin-error');
-      if (err) err.textContent = 'Incorrect PIN \u2014 try again';
-      input.value = '';
-      input.focus();
-    }
   }
 
   async function loadDashboard() {
@@ -5885,9 +5844,7 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
       e.stopPropagation();
       const id  = btn.dataset.id;
       const ref = btn.dataset.ref;
-      const pin = prompt(`Enter admin PIN to delete ${ref}:`);
-      if (!pin) return true;
-      if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN — deletion cancelled'); return true; }
+      if (!confirm(`Delete ${ref}? This cannot be undone.`)) return true;
       (async () => {
         await sb.from('goods_in_lines').delete().eq('po_id', id);
         const { error } = await sb.from('goods_in_pos').delete().eq('id', id);
@@ -6467,9 +6424,7 @@ const APP_VERSION = 'v3.3.4 SANDBOX';
       e.stopPropagation();
       const id  = btn.dataset.id;
       const ref = btn.dataset.ref;
-      const pin = prompt(`Enter admin PIN to delete ${ref}:`);
-      if (!pin) return true;
-      if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN — deletion cancelled'); return true; }
+      if (!confirm(`Delete ${ref}? This cannot be undone.`)) return true;
       (async () => {
         await sb.from('goods_out_lines').delete().eq('order_id', id);
         await sb.from('goods_out_orders').delete().eq('id', id);
