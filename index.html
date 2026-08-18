@@ -1,4 +1,4 @@
-<!-- Talli v3.3.0 SANDBOX - deployed 17 Aug 2026 -->
+<!-- Talli v3.3.1 SANDBOX - deployed 18 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.3.0 SANDBOX';
+const APP_VERSION = 'v3.3.1 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.3.0 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.3.0 SANDBOX';
+  const VERSION = 'v3.3.1 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -653,6 +653,7 @@ const APP_VERSION = 'v3.3.0 SANDBOX';
     /* global */
     view:   'home',
     module: 'home',
+    helmUser: null,   /* user object received from Helm via postMessage */
     /* module 1 - pick verifier */
     session: null,
     checks:  {},
@@ -728,6 +729,7 @@ const APP_VERSION = 'v3.3.0 SANDBOX';
   function render() {
     applyTheme(state.module);
     const root = document.getElementById('root');
+    if (!state.helmUser) { root.innerHTML = renderGate(); return; }
     const v = state.view;
     if (v === 'home')          root.innerHTML = renderHome();
     else if (v === 'pp-home')  root.innerHTML = renderPPHome();
@@ -777,6 +779,15 @@ const APP_VERSION = 'v3.3.0 SANDBOX';
   /* ═══════════════════════════════════════════════
      HOME VIEW
   ═══════════════════════════════════════════════ */
+  function renderGate() {
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px 24px;">
+        <div style="font-size:2.5rem;margin-bottom:16px;">🔒</div>
+        <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:8px;">Access via Helm</div>
+        <div style="font-size:.9rem;color:var(--muted);">Please open Talli through the Helm dashboard.</div>
+      </div>`;
+  }
+
   function renderHome() {
     const h = new Date().getHours();
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
@@ -811,19 +822,14 @@ const APP_VERSION = 'v3.3.0 SANDBOX';
           <span class="lp-desc">Pick, pack and sign off any outbound order.</span>
           <span class="lp-glyph" style="color:#059669;">${ic.check}</span>
         </button>
-        <button class="lp-card c-orange" data-action="open-module" data-mod="delivery">
-          <span class="lp-num">03</span>
-          <span class="lp-name">Driver Hub</span>
-          <span class="lp-desc">All van jobs — deliveries, collections and remedial runs.</span>
-          <span class="lp-glyph" style="color:#ea580c;">${ic.truck}</span>
-        </button>
         <button class="lp-card c-teal" data-action="open-module" data-mod="stock" style="position:relative;">
           <span class="lp-num">04</span>
           <span class="lp-name">Stock Checker</span>
           <span class="lp-desc">Counts, levels and audit trail.</span>
           <span class="lp-glyph" style="color:#0d9488;">${ic.pkg}</span>
         </button>
-        <button class="lp-card c-slate" data-action="open-module" data-mod="admin">
+        ${(state.helmUser?.permitted_modules || []).includes('talli-admin') ? `
+        <button class="lp-card c-slate" data-action="open-module" data-mod="admin" style="position:relative;">
           <span class="lp-num">05</span>
           <span class="lp-name">Admin</span>
           <span class="lp-desc">Dashboard and management tools.</span>
@@ -832,13 +838,12 @@ const APP_VERSION = 'v3.3.0 SANDBOX';
             const total = (state.c5out.badgeCount || 0) +
               (state.dash.m1 || []).reduce((s, g) => s + g.items.length, 0) +
               (state.dash.m2 || []).reduce((s, [, rows]) => s + rows.length, 0) +
-              (state.dash.m3 || []).reduce((s, [, rows]) => s + rows.length, 0) +
               (state.dash.m5 || []).length +
               (state.dash.goOrders || []).length +
               (state.dash.allReadyRemedials || []).length;
             return total > 0 ? `<span class="lp-badge-count">${total}</span>` : '';
           })()}
-        </button>
+        </button>` : ''}
       </div>`;
   }
 
@@ -6573,6 +6578,17 @@ const APP_VERSION = 'v3.3.0 SANDBOX';
       body: JSON.stringify({ module: 'talli', version: VERSION, updated_at: new Date().toISOString() })
     }).catch(function(e) { console.warn('Version push failed:', e); });
   })();
+
+  // ── HELM_USER POSTMESSAGE LISTENER ───────────────────────────────────────
+  // Receives user identity from Helm parent on iframe load.
+  // App stays on gate screen until this fires.
+  window.addEventListener('message', function(e) {
+    if (e.origin !== 'https://i3rink.github.io') return;
+    if (e.data && e.data.type === 'HELM_USER') {
+      state.helmUser = e.data.user || null;
+      render();
+    }
+  });
 
 })();
 </script>
