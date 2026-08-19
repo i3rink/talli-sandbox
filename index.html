@@ -1,4 +1,4 @@
-<!-- Talli v3.3.5 SANDBOX - deployed 18 Aug 2026 -->
+<!-- Talli v3.3.6 SANDBOX - deployed 19 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.3.5 SANDBOX';
+const APP_VERSION = 'v3.3.6 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.3.5 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.3.5 SANDBOX';
+  const VERSION = 'v3.3.6 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick & Pack · ' + VERSION,
@@ -850,7 +850,7 @@ const APP_VERSION = 'v3.3.5 SANDBOX';
      PICK & PACK HOME
   ═══════════════════════════════════════════════ */
   function renderPPHome() {
-    const remedialCount = (state.c6.items || []).filter(r => r.status === 'approved').length;
+    const remedialCount = (state.c6.items || []).filter(r => r.status === 'ready').length;
     const remedialBadge = remedialCount > 0
       ? `<span style="display:inline-block;margin-left:8px;background:#dc2626;color:#fff;font-size:.7rem;font-weight:800;min-width:20px;height:20px;border-radius:50%;text-align:center;line-height:20px;padding:0 4px;">${remedialCount}</span>`
       : '';
@@ -4241,7 +4241,7 @@ const APP_VERSION = 'v3.3.5 SANDBOX';
     const m1Count = m1.reduce((s, g) => s + g.items.length, 0);
     const m2Count = m2.reduce((s, [, rows]) => s + rows.length, 0);
     const m3Count = m3.reduce((s, [, rows]) => s + rows.length, 0);
-    const remTalli  = (allReadyRemedials || []).filter(r => r.source === 'talli');
+    const remTalli  = (allReadyRemedials || []).filter(r => r.source === 'talli' || r.source === 'm2_shortfall');
     const remFitter = (allReadyRemedials || []).filter(r => r.source === 'fitter');
     const remHaul   = (allReadyRemedials || []).filter(r => r.source === 'haul');
     const remAdhoc  = (allReadyRemedials || []).filter(r => r.source === 'adhoc');
