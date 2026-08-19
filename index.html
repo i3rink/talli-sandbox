@@ -1,4 +1,4 @@
-<!-- Talli v3.3.6 SANDBOX - deployed 19 Aug 2026 -->
+<!-- Talli v3.3.7 SANDBOX - deployed 19 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -591,7 +591,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.3.6 SANDBOX';
+const APP_VERSION = 'v3.3.7 SANDBOX';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -620,7 +620,7 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.3.6 SANDBOX';
+  const VERSION = 'v3.3.7 SANDBOX';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick & Pack · ' + VERSION,
@@ -3220,7 +3220,8 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
     if (action === 'c6-mark-complete') {
       const id = btn.dataset.id;
       if (!id) return;
-      const item = (state.dash.allReadyRemedials || []).find(r => r.id === id);
+      const item = (state.c6.items || []).find(r => r.id === id)
+                || (state.dash.allReadyRemedials || []).find(r => r.id === id);
       if (!item) return;
       state.c6.capture = { id, item, postcode: '', doorNumber: '', remedialType: 'delivery' };
       state.view = 'c6-capture';
@@ -3250,6 +3251,12 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
       cap.postcode   = postcode;
       cap.doorNumber = doorNumber;
       markRemedialComplete(cap);
+      return;
+    }
+    if (action === 'c6-need-order') {
+      const id = btn.dataset.id;
+      if (!id) return;
+      markRemedialNeedsOrder(id);
       return;
     }
     if (action === 'c2-copy-short') { copyC2Shortfall(); return; }
@@ -3973,7 +3980,7 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
       const STOCK_COLS = 'id,name,sku,current_qty,low_stock_qty,backorder_until,backorder_note,stocked,oos_expected_date,oos_expected_label';
 
       const [
-        picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes, goRes, allReadyRemRes,
+        picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes, goRes, allReadyRemRes, allOrderedRemRes,
       ] = await Promise.allSettled([
         sb.from('pick_completions').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
         sb.from('deliveries').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
@@ -3984,17 +3991,19 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
         sb.from('goods_in_lines').select('*, goods_in_pos(po_number, supplier, po_date)').or('has_partial.eq.true,has_damage.eq.true').eq('resolved', false).order('created_at', { ascending: false }).limit(100),
         sb.from('goods_out_orders').select('id,invoice_ref,collector_name,customer_type,fulfilment_type,status,created_at').in('status', ['pending','staged']).order('created_at', { ascending: false }).limit(100),
         sb.from('remedials').select('id,session_id,job_ref,item_key,item_name,shortfall_qty,remedial_type,source,notes,created_at').eq('status', 'ready').order('created_at', { ascending: false }).limit(200),
+        sb.from('remedials').select('id,session_id,job_ref,item_key,item_name,shortfall_qty,remedial_type,source,notes,created_at').eq('status', 'ordered').order('ordered_at', { ascending: false }).limit(200),
       ]);
 
-      const picks          = picksRes.status       === 'fulfilled' ? (picksRes.value.data       || []) : [];
-      const delivs         = delivsRes.status      === 'fulfilled' ? (delivsRes.value.data      || []) : [];
-      const remedialPoData = remedialPoRes.status  === 'fulfilled' ? (remedialPoRes.value.data  || []) : [];
-      const shortChecks    = shortChecksRes.status === 'fulfilled' ? (shortChecksRes.value.data || []) : [];
-      const alts           = altsRes.status        === 'fulfilled' ? (altsRes.value.data        || []) : [];
-      const stock          = stockRes.status       === 'fulfilled' ? (stockRes.value.data       || []) : [];
-      const giExceptions   = giRes.status          === 'fulfilled' ? (giRes.value.data          || []) : [];
-      const goOrders       = goRes.status          === 'fulfilled' ? (goRes.value.data          || []) : [];
-      const allReadyRemedials = allReadyRemRes.status === 'fulfilled' ? (allReadyRemRes.value.data || []) : [];
+      const picks               = picksRes.status          === 'fulfilled' ? (picksRes.value.data          || []) : [];
+      const delivs              = delivsRes.status         === 'fulfilled' ? (delivsRes.value.data         || []) : [];
+      const remedialPoData      = remedialPoRes.status     === 'fulfilled' ? (remedialPoRes.value.data     || []) : [];
+      const shortChecks         = shortChecksRes.status    === 'fulfilled' ? (shortChecksRes.value.data    || []) : [];
+      const alts                = altsRes.status           === 'fulfilled' ? (altsRes.value.data           || []) : [];
+      const stock               = stockRes.status          === 'fulfilled' ? (stockRes.value.data          || []) : [];
+      const giExceptions        = giRes.status             === 'fulfilled' ? (giRes.value.data             || []) : [];
+      const goOrders            = goRes.status             === 'fulfilled' ? (goRes.value.data             || []) : [];
+      const allReadyRemedials   = allReadyRemRes.status    === 'fulfilled' ? (allReadyRemRes.value.data    || []) : [];
+      const allOrderedRemedials = allOrderedRemRes.status  === 'fulfilled' ? (allOrderedRemRes.value.data  || []) : [];
 
       /* ── Remedial PO refs ── */
       state.dashRemedialPORefs = {};
@@ -4044,7 +4053,7 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
       state.dash = {
         loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts,
         stockTotal: stock.length, stockCounted, stockLow, stockBackorder, stockAll: stock,
-        m5: giExceptions, goOrders, allReadyRemedials,
+        m5: giExceptions, goOrders, allReadyRemedials, allOrderedRemedials,
       };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
@@ -4237,15 +4246,19 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
   }
 
   function renderDashboardContent() {
-    const { m1, m2, m3, allReadyRemedials } = state.dash;
+    const { m1, m2, m3, allReadyRemedials, allOrderedRemedials } = state.dash;
     const m1Count = m1.reduce((s, g) => s + g.items.length, 0);
     const m2Count = m2.reduce((s, [, rows]) => s + rows.length, 0);
     const m3Count = m3.reduce((s, [, rows]) => s + rows.length, 0);
-    const remTalli  = (allReadyRemedials || []).filter(r => r.source === 'talli' || r.source === 'm2_shortfall');
-    const remFitter = (allReadyRemedials || []).filter(r => r.source === 'fitter');
-    const remHaul   = (allReadyRemedials || []).filter(r => r.source === 'haul');
-    const remAdhoc  = (allReadyRemedials || []).filter(r => r.source === 'adhoc');
-    const remTotal  = (allReadyRemedials || []).length;
+    const remTalli  = (allReadyRemedials   || []).filter(r => r.source === 'talli' || r.source === 'm2_shortfall');
+    const remFitter = (allReadyRemedials   || []).filter(r => r.source === 'fitter');
+    const remHaul   = (allReadyRemedials   || []).filter(r => r.source === 'haul');
+    const remAdhoc  = (allReadyRemedials   || []).filter(r => r.source === 'adhoc');
+    const ordTalli  = (allOrderedRemedials || []).filter(r => r.source === 'talli' || r.source === 'm2_shortfall');
+    const ordFitter = (allOrderedRemedials || []).filter(r => r.source === 'fitter');
+    const ordHaul   = (allOrderedRemedials || []).filter(r => r.source === 'haul');
+    const ordAdhoc  = (allOrderedRemedials || []).filter(r => r.source === 'adhoc');
+    const remTotal  = (allReadyRemedials   || []).length + (allOrderedRemedials || []).length;
     const stockHtml = renderStockDashSection();
 
     if (!m1Count && !m2Count && !m3Count && !remTotal) {
@@ -4359,6 +4372,20 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
       </div>`;
     };
 
+    /* helper — renders a single ordered (awaiting stock) remedial row */
+    const renderOrderedRow = r => {
+      const jobDisplay = displayJobRef(r.job_ref || '') || r.job_ref || '—';
+      const name = (r.item_name && r.item_name.trim() && r.item_name !== '.') ? esc(r.item_name) : esc(r.item_key || 'Item');
+      const notesLine = r.notes ? `<div style="font-size:.8rem;color:var(--muted);margin-top:3px;font-style:italic;">${esc(r.notes)}</div>` : '';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--border);opacity:.8;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:.9rem;">${name} <span style="font-size:.7rem;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:4px;">AWAITING STOCK</span></div>
+          <div style="font-size:.78rem;color:var(--muted);margin-top:2px;">Job ${esc(jobDisplay)} &middot; Qty ${r.shortfall_qty || '—'}</div>
+          ${notesLine}
+        </div>
+      </div>`;
+    };
+
     /* helper — renders a group sub-header */
     const remGroupHead = (label, colour, count, extra) =>
       `<div style="display:flex;align-items:center;gap:8px;padding:10px 0 6px 12px;border-bottom:2px solid ${colour};">
@@ -4414,19 +4441,26 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
           </div>
         </div>`;
     }).join('');
-    const pickCount = remTalli.length + m3Count;
-    const pickBody = (pickShortfallReadyRows || jobBlocks) ? (pickShortfallReadyRows + jobBlocks) : nothingRow;
+    const pickCount = remTalli.length + ordTalli.length + m3Count;
+    const pickOrderedRows = ordTalli.map(renderOrderedRow).join('');
+    const pickBody = (pickShortfallReadyRows || jobBlocks || pickOrderedRows) ? (pickShortfallReadyRows + jobBlocks + pickOrderedRows) : nothingRow;
 
     /* Fitter group */
-    const fitterBody = remFitter.length ? remFitter.map(renderReadyRow).join('') : nothingRow;
+    const fitterBody = (remFitter.length || ordFitter.length)
+      ? remFitter.map(renderReadyRow).join('') + ordFitter.map(renderOrderedRow).join('')
+      : nothingRow;
 
     /* Driver group */
-    const driverBody = remHaul.length ? remHaul.map(renderReadyRow).join('') : nothingRow;
+    const driverBody = (remHaul.length || ordHaul.length)
+      ? remHaul.map(renderReadyRow).join('') + ordHaul.map(renderOrderedRow).join('')
+      : nothingRow;
 
     /* Ad hoc group */
     const adhocAddBtn = `<button class="btn btn-ghost" data-action="dash-adhoc-remedial"
       style="font-size:.75rem;color:#475569;border-color:#cbd5e1;padding:3px 10px;margin-left:auto;">+ Raise ad hoc</button>`;
-    const adhocBody = remAdhoc.length ? remAdhoc.map(renderReadyRow).join('') : nothingRow;
+    const adhocBody = (remAdhoc.length || ordAdhoc.length)
+      ? remAdhoc.map(renderReadyRow).join('') + ordAdhoc.map(renderOrderedRow).join('')
+      : nothingRow;
 
     const m3Total = remTotal + m3Count;
     const m3Html = `<div class="dash-section">
@@ -4440,13 +4474,13 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
         ${remGroupHead('Pick shortfall', '#0075ab', pickCount)}
         ${pickBody}
         <div style="margin-bottom:4px;"></div>
-        ${remGroupHead('Fitter', '#7c3aed', remFitter.length)}
+        ${remGroupHead('Fitter', '#7c3aed', remFitter.length + ordFitter.length)}
         ${fitterBody}
         <div style="margin-bottom:4px;"></div>
-        ${remGroupHead('Driver', '#ea580c', remHaul.length)}
+        ${remGroupHead('Driver', '#ea580c', remHaul.length + ordHaul.length)}
         ${driverBody}
         <div style="margin-bottom:4px;"></div>
-        ${remGroupHead('Ad hoc', '#64748b', remAdhoc.length, adhocAddBtn)}
+        ${remGroupHead('Ad hoc', '#64748b', remAdhoc.length + ordAdhoc.length, adhocAddBtn)}
         ${adhocBody}
       </div>
     </div>`;
@@ -4974,7 +5008,7 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
     try {
       const cols = 'id,session_id,job_ref,item_key,item_name,shortfall_qty,remedial_type,source,notes,status,created_at';
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/remedials?select=${cols}&status=eq.ready&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/remedials?select=${cols}&status=in.(pending,ready)&order=created_at.desc`,
         {
           headers: {
             'apikey':        SUPABASE_ANON,
@@ -4986,7 +5020,7 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       state.c6.items = data || [];
-      state.c6.badgeCount = (data || []).length;
+      state.c6.badgeCount = (data || []).filter(r => r.status === 'pending' || r.status === 'ready').length;
     } catch (e) {
       console.error('C6 load error:', e.message);
     } finally {
@@ -5002,6 +5036,26 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
   async function markRemedialReady(id) {
     const { error } = await sb.from('remedials').update({ status: 'ready', actioned_at: new Date().toISOString() }).eq('id', id);
     if (error) { toast('Failed to update: ' + (error.message || 'unknown error')); return; }
+    await loadC6Remedials();
+    render();
+  }
+
+  async function markRemedialNeedsOrder(id) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/remedials?id=eq.${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey':        SUPABASE_ANON,
+          'Authorization': `Bearer ${SUPABASE_ANON}`,
+          'Content-Type':  'application/json',
+          'Prefer':        'return=minimal',
+        },
+        body: JSON.stringify({ status: 'ordered', ordered_at: new Date().toISOString() }),
+      }
+    );
+    if (!res.ok) { toast('Failed to update — try again'); return; }
+    toast('Flagged for ordering — visible to admin');
     await loadC6Remedials();
     render();
   }
@@ -5085,39 +5139,65 @@ const APP_VERSION = 'v3.3.6 SANDBOX';
   }
 
   function renderC6List() {
-    const items = state.c6.items.filter(r => r.status === 'ready');
     if (state.c6.loading) return '<div class="card"><div class="text-muted text-sm">Loading...</div></div>';
 
-    const renderItem = r => {
-      const jobDisplay = displayJobRef(r.job_ref || '');
+    const pending = state.c6.items.filter(r => r.status === 'pending');
+    const ready   = state.c6.items.filter(r => r.status === 'ready');
+
+    const sourceLabel = s => s === 'fitter' ? ' &middot; Fitter' : s === 'adhoc' ? ' &middot; Ad hoc' : s === 'haul' ? ' &middot; Driver' : '';
+
+    const renderPendingItem = r => {
+      const jobDisplay = displayJobRef(r.job_ref || '') || r.job_ref || '—';
+      const name = (r.item_name && r.item_name.trim() && r.item_name !== '.') ? r.item_name : (r.item_key || 'Item');
+      const notesHtml = r.notes ? '<div style="font-size:.82rem;color:var(--text);margin-top:4px;font-style:italic;">' + esc(r.notes) + '</div>' : '';
+      return '<div style="padding:14px 0;border-bottom:1px solid var(--border);">'
+        + '<div style="font-weight:600;font-size:.95rem;margin-bottom:4px;">' + esc(name) + '</div>'
+        + '<div style="font-size:.8rem;color:var(--muted);margin-bottom:10px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + (r.shortfall_qty || '—') + sourceLabel(r.source) + '</div>'
+        + notesHtml
+        + '<div style="display:flex;gap:8px;margin-top:8px;">'
+        + '<button class="btn btn-sm" style="background:#059669;color:#fff;flex:1;" data-action="c6-mark-complete" data-id="' + r.id + '">Can pick</button>'
+        + '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;flex:1;" data-action="c6-need-order" data-id="' + r.id + '">Need to order</button>'
+        + '</div>'
+        + '</div>';
+    };
+
+    const renderReadyItem = r => {
+      const jobDisplay = displayJobRef(r.job_ref || '') || r.job_ref || '—';
       const name = (r.item_name && r.item_name.trim() && r.item_name !== '.') ? r.item_name : (r.item_key || 'Item');
       const isCollection = r.remedial_type === 'collection';
       const typeLabel = isCollection
         ? '<span style="font-size:.7rem;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:6px;">COLLECTION</span>'
         : '<span style="font-size:.7rem;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:6px;">DELIVERY</span>';
-      const sourceTag = r.source === 'adhoc' ? ' &middot; Ad hoc' : r.source === 'fitter' ? ' &middot; Fitter' : '';
-      const notesHtml = r.notes
-        ? '<div style="font-size:.82rem;color:var(--text);margin-top:4px;font-style:italic;">' + esc(r.notes) + '</div>'
-        : '';
+      const notesHtml = r.notes ? '<div style="font-size:.82rem;color:var(--text);margin-top:4px;font-style:italic;">' + esc(r.notes) + '</div>' : '';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);">'
         + '<div>'
         + '<div style="font-weight:600;font-size:.95rem;">' + esc(name) + typeLabel + '</div>'
-        + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + (r.shortfall_qty || '—') + sourceTag + '</div>'
+        + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + (r.shortfall_qty || '—') + sourceLabel(r.source) + '</div>'
         + notesHtml
         + '</div>'
         + '<button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;padding:8px 14px;" data-action="c6-mark-complete" data-id="' + r.id + '">Picked &amp; packed</button>'
         + '</div>';
     };
 
-    const bodyHtml = items.length
-      ? items.map(renderItem).join('')
-      : '<div class="text-muted text-sm" style="padding:16px 0;">No remedials outstanding.</div>';
+    const sectionHead = (label, colour, count) =>
+      '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:' + colour + ';padding:10px 0 6px;border-bottom:2px solid ' + colour + ';display:flex;align-items:center;gap:8px;">'
+      + label
+      + '<span style="background:' + colour + ';color:#fff;padding:1px 7px;border-radius:10px;">' + count + '</span>'
+      + '</div>';
+
+    const pendingSection = sectionHead('Check stock', '#f59e0b', pending.length)
+      + (pending.length ? pending.map(renderPendingItem).join('') : '<div class="text-muted text-sm" style="padding:10px 0;">Nothing to triage.</div>');
+
+    const readySection = sectionHead('Ready to pick', '#059669', ready.length)
+      + (ready.length ? ready.map(renderReadyItem).join('') : '<div class="text-muted text-sm" style="padding:10px 0;">Nothing ready yet.</div>');
 
     return '<div class="module-wrap">'
       + '<button class="btn btn-ghost back-btn" data-action="go-home">&#8592; Home</button>'
       + '<h2 class="module-title">Remedial Deliveries</h2>'
       + '<div class="card">'
-      + bodyHtml
+      + pendingSection
+      + '<div style="margin-top:16px;"></div>'
+      + readySection
       + '</div>'
       + '</div>';
   }
